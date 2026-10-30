@@ -1,0 +1,7 @@
+dist
+coverage
+node_modules
+package-lock.json
+
+# Written by changesets; leave its formatting alone so a release cannot fail format:check.
+CHANGELOG.md
