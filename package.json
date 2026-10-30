@@ -1,0 +1,105 @@
+{
+  "name": "@seamless-auth/oidc-provider",
+  "version": "0.0.0",
+  "description": "OpenID Provider service for Seamless Auth, backed by the private Seamless Auth API.",
+  "author": "Fells Code, LLC",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "seamless-oidc-provider": "./dist/server.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fells-code/seamless-auth-oidc-provider.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fells-code/seamless-auth-oidc-provider/issues"
+  },
+  "homepage": "https://github.com/fells-code/seamless-auth-oidc-provider#readme",
+  "keywords": [
+    "openid-connect",
+    "oidc",
+    "oauth2",
+    "passkeys",
+    "seamless-auth"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "dev": "tsx watch --env-file .env src/server.ts",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "check:changeset-bump": "node scripts/check-changeset-bump.mjs",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "npm run build && changeset publish",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/",
+    "provenance": true
+  },
+  "dependencies": {
+    "@seamless-auth/core": "^0.22.0",
+    "@seamless-auth/express": "^0.22.0",
+    "@seamless-auth/types": "0.34.0-next.0",
+    "express": "^5.3.0",
+    "oidc-provider": "~9.13.3",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^3.0.3",
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
+    "@eslint/js": "^10.0.1",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.19.2",
+    "@types/oidc-provider": "~9.13.1",
+    "@typescript-eslint/eslint-plugin": "^8.72.1",
+    "@typescript-eslint/parser": "^8.72.1",
+    "@vitest/coverage-v8": "^5.0.5",
+    "eslint": "^10.13.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-license-header": "^0.9.0",
+    "eslint-plugin-simple-import-sort": "^14.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "prettier": "^3.9.10",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.0.5"
+  }
+}

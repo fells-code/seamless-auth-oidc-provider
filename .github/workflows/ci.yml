@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  pull_request:
+    branches: ['**']
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # A pull request only ever runs ci.yml and codeql.yml, so a mistake in
+  # release.yml or docker-publish.yml reaches main unchallenged and is not
+  # noticed until a release goes quiet. This is the one check that reads those
+  # files on every pull request.
+  workflows:
+    name: Lint workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      # Pinned by version and checksum rather than installed by the upstream
+      # download script, which curls an unpinned ref into bash. Dependabot does
+      # not track either form, so this pair is bumped by hand.
+      ACTIONLINT_VERSION: 1.7.12
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install actionlint
+        run: |
+          set -euo pipefail
+          ARCHIVE="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL -o "${ARCHIVE}" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${ARCHIVE}"
+          echo "${ACTIONLINT_SHA256}  ${ARCHIVE}" | sha256sum -c -
+          tar -xzf "${ARCHIVE}" actionlint
+
+      # shellcheck is preinstalled on the runner, so this also covers the shell
+      # in every run: block.
+      - name: Lint workflow files
+        run: ./actionlint -color
+
+  test:
+    name: test (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # The supported range is engines >=22: the oldest supported LTS, the
+        # development default from .nvmrc, and the newest release.
+        node-version: [22, 24, latest]
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Fails on a high or critical in anything that ships.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      # The package is pre-1.0. A major changeset would release 1.0.0 as a side
+      # effect of landing a breaking change rather than as a decision.
+      - name: Check changeset bump level
+        run: npm run check:changeset-bump
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test with coverage
+        run: CI=true npm run coverage
+
+      - name: Build
+        run: npm run build
+
+  docker:
+    name: Build image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build image
+        run: docker build -t seamless-auth-oidc-provider:ci .
