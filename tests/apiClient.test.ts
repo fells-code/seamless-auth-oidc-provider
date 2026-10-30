@@ -77,9 +77,23 @@ describe('OidcApiClient', () => {
     await expect(client.findPayloadByUid('Session', 'missing')).resolves.toBeUndefined();
     await expect(client.findPayloadByUserCode('DeviceCode', 'x')).resolves.toBeUndefined();
     await expect(client.client('missing')).resolves.toBeUndefined();
-    await expect(client.account('missing')).resolves.toBeUndefined();
-    await expect(client.authContext('missing')).resolves.toBeUndefined();
+    await expect(
+      client.account('missing', { clientId: 'app', sessionId: 's1' }),
+    ).resolves.toBeUndefined();
+    await expect(client.authContext('missing', 'app')).resolves.toBeUndefined();
     await expect(client.verifySecret('missing', 'secret')).resolves.toBe(false);
+  });
+
+  it('names the session and client a lookup serves', async () => {
+    const { api, client } = setup();
+    await client.account('u1', { clientId: 'app', sessionId: 's1' });
+    await client.authContext('s1', 'app');
+
+    const [account, context] = api.requests;
+    expect(account?.path).toBe('/oidc/accounts/u1');
+    expect(account?.search).toBe('?clientId=app&sessionId=s1');
+    expect(context?.path).toBe('/oidc/sessions/s1/auth-context');
+    expect(context?.search).toBe('?clientId=app');
   });
 
   it('treats 404 as done for idempotent writes', async () => {
@@ -132,6 +146,7 @@ describe('OidcApiClient', () => {
       if (path === '/oidc/payloads/Grant/g1') {
         return json(200, {
           payload: { accountId: 'u1' },
+          sessionId: null,
           expiresAt: '2026-10-30T12:00:00.000Z',
           consumedAt: null,
         });

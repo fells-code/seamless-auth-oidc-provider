@@ -30,6 +30,7 @@ function setup() {
 const record = (consumedAt: string | null) =>
   json(200, {
     payload: { jti: 'c1', kind: 'AuthorizationCode' },
+    sessionId: null,
     expiresAt: '2026-10-30T12:00:00.000Z',
     consumedAt,
   });

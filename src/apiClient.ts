@@ -13,6 +13,7 @@ import {
 import {
   type OidcAccountClaims,
   OidcAccountClaimsSchema,
+  type OidcAccountQuery,
   type OidcAuthContext,
   OidcAuthContextSchema,
   type OidcClientMetadata,
@@ -186,15 +187,20 @@ export class OidcApiClient {
     return result?.valid === true;
   }
 
-  account(id: string): Promise<OidcAccountClaims | undefined> {
-    return this.#request('GET', routePath(OidcEdgeRoutes.account, { id }), {
+  /** Answers only for the user behind a session holding a grant for `clientId`. */
+  account(id: string, binding: OidcAccountQuery): Promise<OidcAccountClaims | undefined> {
+    const query = new URLSearchParams(binding).toString();
+    return this.#request('GET', `${routePath(OidcEdgeRoutes.account, { id })}?${query}`, {
       schema: OidcAccountClaimsSchema,
       allowNotFound: true,
     });
   }
 
-  authContext(sessionId: string): Promise<OidcAuthContext | undefined> {
-    return this.#request('GET', routePath(OidcEdgeRoutes.sessionAuthContext, { id: sessionId }), {
+  /** Answers only while the session holds a grant for `clientId`, so save the Grant first. */
+  authContext(sessionId: string, clientId: string): Promise<OidcAuthContext | undefined> {
+    const query = new URLSearchParams({ clientId }).toString();
+    const path = routePath(OidcEdgeRoutes.sessionAuthContext, { id: sessionId });
+    return this.#request('GET', `${path}?${query}`, {
       schema: OidcAuthContextSchema,
       allowNotFound: true,
     });

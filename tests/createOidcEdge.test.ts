@@ -14,7 +14,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { OidcApiClient } from '../src/apiClient.js';
 import { createOidcEdge } from '../src/createOidcEdge.js';
 import { buildProviderConfiguration, createFindAccount } from '../src/providerConfig.js';
-import { currentRequestContext } from '../src/requestContext.js';
+import { currentRequestContext, runWithRequestContext } from '../src/requestContext.js';
 import { ApiSigningKey } from '../src/signingKey.js';
 import { API_URL, createFakeApi, ISSUER, json, rsaKey, SERVICE_SECRET } from './fakeApi.js';
 
@@ -238,7 +238,9 @@ describe('buildProviderConfiguration', () => {
 });
 
 describe('createFindAccount', () => {
-  const ctx = {} as KoaContextWithOIDC;
+  const ctx = { oidc: { client: { clientId: 'app' } } } as unknown as KoaContextWithOIDC;
+  const inSession = <T>(fn: () => T) =>
+    runWithRequestContext({ correlationId: 'c1', sessionId: 's1' }, fn);
 
   it('releases account claims and drops an empty org', async () => {
     const api = createFakeApi();
@@ -262,7 +264,8 @@ describe('createFindAccount', () => {
     });
     const findAccount = createFindAccount(client);
 
-    const account = await findAccount(ctx, 'u1');
+    const account = await inSession(() => findAccount(ctx, 'u1'));
+    expect(api.requests.at(-1)?.search).toBe('?clientId=app&sessionId=s1');
     expect(account?.accountId).toBe('u1');
     expect(await account?.claims('id_token', 'openid', {}, [])).toEqual({
       sub: 'u1',
@@ -270,8 +273,22 @@ describe('createFindAccount', () => {
       email_verified: true,
       roles: ['user'],
     });
-    const withOrg = await findAccount(ctx, 'u2');
+    const withOrg = await inSession(() => findAccount(ctx, 'u2'));
     expect(await withOrg?.claims('userinfo', 'openid', {}, [])).toMatchObject({ org_id: 'org-1' });
-    expect(await findAccount(ctx, 'missing')).toBeUndefined();
+    expect(await inSession(() => findAccount(ctx, 'missing'))).toBeUndefined();
+  });
+
+  it('asks for nothing without a session and a client to bind to', async () => {
+    const api = createFakeApi();
+    const client = new OidcApiClient({
+      apiUrl: API_URL,
+      serviceSecret: SERVICE_SECRET,
+      fetch: api.fetch,
+    });
+    const findAccount = createFindAccount(client);
+
+    expect(await findAccount(ctx, 'u1')).toBeUndefined();
+    expect(await inSession(() => findAccount({} as KoaContextWithOIDC, 'u1'))).toBeUndefined();
+    expect(api.requests).toHaveLength(0);
   });
 });

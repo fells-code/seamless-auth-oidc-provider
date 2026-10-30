@@ -15,6 +15,7 @@ export const SERVICE_SECRET = 'service-secret-that-is-at-least-32-characters';
 export interface RecordedRequest {
   method: string;
   path: string;
+  search: string;
   headers: Headers;
   body: unknown;
 }
@@ -69,6 +70,7 @@ export function createFakeApi() {
     const request: RecordedRequest = {
       method: init?.method ?? 'GET',
       path: url.pathname,
+      search: url.search,
       headers: new Headers(init?.headers),
       body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
     };

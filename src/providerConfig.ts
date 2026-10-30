@@ -9,6 +9,7 @@ import type { Configuration, FindAccount } from 'oidc-provider';
 
 import { createApiAdapterFactory } from './adapter.js';
 import type { OidcApiClient } from './apiClient.js';
+import { currentRequestContext } from './requestContext.js';
 import type { ApiSigningKey } from './signingKey.js';
 
 export const PROVIDER_COOKIE_NAMES = {
@@ -36,8 +37,14 @@ export interface ProviderConfigurationInput {
 }
 
 export function createFindAccount(client: OidcApiClient): FindAccount {
-  return async (_ctx, sub) => {
-    const claims = await client.account(sub);
+  return async (ctx, sub) => {
+    // The API releases claims only for the session and client this request serves.
+    const clientId = ctx.oidc?.client?.clientId;
+    const sessionId = currentRequestContext()?.sessionId;
+    if (!clientId || !sessionId) {
+      return undefined;
+    }
+    const claims = await client.account(sub, { clientId, sessionId });
     if (!claims) {
       return undefined;
     }
