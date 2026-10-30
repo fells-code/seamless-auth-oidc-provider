@@ -43,16 +43,16 @@ docker run -p 5314:5314 --env-file .env ghcr.io/fells-code/seamless-auth-oidc-pr
 
 ## Configuration
 
-| Variable                 | Required | Description                                                             |
-| ------------------------ | -------- | ----------------------------------------------------------------------- |
-| `SEAMLESS_API_URL`       | yes      | The private API, as this service reaches it.                            |
-| `SEAMLESS_API_ISSUER`    | no       | The API's `ISSUER`, when it differs from `SEAMLESS_API_URL`.            |
-| `SEAMLESS_SERVICE_TOKEN` | yes      | The service token secret shared with the API. At least 32 characters.   |
-| `SEAMLESS_JWKS_KID`      | no       | The `kid` on the service tokens this service signs.                     |
-| `SEAMLESS_COOKIE_SECRET` | yes      | Signs the first-party session cookies. At least 32 characters.          |
-| `OIDC_COOKIE_KEYS`       | yes      | Comma-separated provider cookie keys. The first signs, the rest verify. |
-| `TRUST_PROXY`            | no       | `true` when TLS ends at a proxy in front of this service.               |
-| `PORT`                   | no       | Defaults to `5314`.                                                     |
+| Variable                      | Required | Description                                                                                                                                                                                            |
+| ----------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `SEAMLESS_API_URL`            | yes      | The private API, as this service reaches it.                                                                                                                                                           |
+| `SEAMLESS_API_ISSUER`         | no       | The API's `ISSUER`, when it differs from `SEAMLESS_API_URL`.                                                                                                                                           |
+| `SEAMLESS_OIDC_SERVICE_TOKEN` | yes      | This service's own service token secret, `SEAMLESS_OIDC_SERVICE_TOKEN` on the API. It must differ from the adapters' `SEAMLESS_SERVICE_TOKEN`, which this service never holds. At least 32 characters. |
+| `SEAMLESS_JWKS_KID`           | no       | The `kid` on the service tokens this service signs.                                                                                                                                                    |
+| `SEAMLESS_COOKIE_SECRET`      | yes      | Signs the first-party session cookies. At least 32 characters.                                                                                                                                         |
+| `OIDC_COOKIE_KEYS`            | yes      | Comma-separated provider cookie keys. The first signs, the rest verify.                                                                                                                                |
+| `TRUST_PROXY`                 | no       | `true` when TLS ends at a proxy in front of this service.                                                                                                                                              |
+| `PORT`                        | no       | Defaults to `5314`.                                                                                                                                                                                    |
 
 The issuer comes from the API (`oidc_issuer`), not from this service's environment. The service
 answers only requests for the issuer's own scheme and host, and refuses to start when the API
@@ -66,7 +66,7 @@ import { createOidcEdge } from '@seamless-auth/oidc-provider';
 
 const edge = await createOidcEdge({
   apiUrl: process.env.SEAMLESS_API_URL!,
-  serviceSecret: process.env.SEAMLESS_SERVICE_TOKEN!,
+  serviceSecret: process.env.SEAMLESS_OIDC_SERVICE_TOKEN!,
   cookieKeys: process.env.OIDC_COOKIE_KEYS!.split(','),
   adapterCookieSecret: process.env.SEAMLESS_COOKIE_SECRET!,
   trustProxy: true,

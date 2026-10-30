@@ -17,7 +17,7 @@ export const EnvSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(5314),
   SEAMLESS_API_URL: z.url(),
   SEAMLESS_API_ISSUER: z.url().optional(),
-  SEAMLESS_SERVICE_TOKEN: z.string().min(SECRET_MIN_LENGTH),
+  SEAMLESS_OIDC_SERVICE_TOKEN: z.string().min(SECRET_MIN_LENGTH),
   SEAMLESS_JWKS_KID: z.string().min(1).optional(),
   SEAMLESS_COOKIE_SECRET: z.string().min(SECRET_MIN_LENGTH),
   OIDC_COOKIE_KEYS: z

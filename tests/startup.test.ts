@@ -54,7 +54,7 @@ describe('checkApiCompatibility', () => {
 describe('parseEnv', () => {
   const valid = {
     SEAMLESS_API_URL: 'http://auth:5312',
-    SEAMLESS_SERVICE_TOKEN: SERVICE_SECRET,
+    SEAMLESS_OIDC_SERVICE_TOKEN: SERVICE_SECRET,
     SEAMLESS_COOKIE_SECRET: 'cookie-secret-that-is-at-least-32-characters',
     OIDC_COOKIE_KEYS:
       'first-cookie-key-at-least-32-characters, second-cookie-key-at-least-32-chars',
@@ -77,10 +77,10 @@ describe('parseEnv', () => {
 
   it('names the invalid fields without echoing values', () => {
     expect(() =>
-      parseEnv({ ...valid, OIDC_COOKIE_KEYS: 'short', SEAMLESS_SERVICE_TOKEN: 'x' }),
-    ).toThrow(/SEAMLESS_SERVICE_TOKEN, OIDC_COOKIE_KEYS/);
+      parseEnv({ ...valid, OIDC_COOKIE_KEYS: 'short', SEAMLESS_OIDC_SERVICE_TOKEN: 'x' }),
+    ).toThrow(/SEAMLESS_OIDC_SERVICE_TOKEN, OIDC_COOKIE_KEYS/);
     try {
-      parseEnv({ ...valid, SEAMLESS_SERVICE_TOKEN: 'leaky' });
+      parseEnv({ ...valid, SEAMLESS_OIDC_SERVICE_TOKEN: 'leaky' });
     } catch (error) {
       expect(String(error)).not.toContain('leaky');
     }

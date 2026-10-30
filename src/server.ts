@@ -16,7 +16,7 @@ async function main() {
   const edge = await createOidcEdge({
     apiUrl: env.SEAMLESS_API_URL,
     ...(env.SEAMLESS_API_ISSUER ? { apiIssuer: env.SEAMLESS_API_ISSUER } : {}),
-    serviceSecret: env.SEAMLESS_SERVICE_TOKEN,
+    serviceSecret: env.SEAMLESS_OIDC_SERVICE_TOKEN,
     ...(env.SEAMLESS_JWKS_KID ? { serviceTokenKid: env.SEAMLESS_JWKS_KID } : {}),
     cookieKeys: env.OIDC_COOKIE_KEYS,
     adapterCookieSecret: env.SEAMLESS_COOKIE_SECRET,

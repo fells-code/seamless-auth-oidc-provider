@@ -29,7 +29,10 @@ export interface OidcEdgeOptions {
   apiUrl: string;
   /** The API's `ISSUER`, when it differs from `apiUrl`. */
   apiIssuer?: string;
-  /** The shared service token secret (`SEAMLESS_SERVICE_TOKEN` on the API). */
+  /**
+   * This service's own service token secret (`SEAMLESS_OIDC_SERVICE_TOKEN` on the API), used
+   * for `/oidc/*` and for the adapter's first-party calls. Never the adapters' secret.
+   */
   serviceSecret: string;
   serviceTokenKid?: string;
   /** Signs the provider's cookies. The first key signs, the rest still verify. */
