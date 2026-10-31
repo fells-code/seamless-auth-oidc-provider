@@ -119,7 +119,8 @@ An application's own `accessTokenTtlSeconds`, `idTokenTtlSeconds` and `refreshTo
 (admin routes) apply to its tokens. Unset ones use the defaults: 600 seconds for access and ID
 tokens, 14 days for refresh tokens. An access token for a resource with its own lifetime gets
 the shorter of the two. A rotated refresh token for a browser app that cannot bind it to a key
-keeps what was left of the one it replaced, whatever the application's lifetime. The API also
+keeps what was left of the one it replaced, whatever the application's lifetime. The grant
+behind them lives at least as long as the application's refresh tokens. The API also
 ends every record when the first-party session behind it ends.
 
 ## Refresh tokens and client credentials

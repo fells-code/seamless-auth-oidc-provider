@@ -90,6 +90,18 @@ describe('per-application token lifetimes', () => {
     expect(refreshRecordTtl()).toBeLessThanOrEqual(3600);
   });
 
+  it('keeps the grant at least as long as a refresh token longer than 14 days', async () => {
+    const longRefresh = {
+      ...shortLived,
+      client_id: 'first-party-long-refresh',
+      'urn:seamless:refresh_token_ttl': 60 * 86_400,
+    };
+    started.store.addClient(longRefresh);
+    await signInAs(longRefresh);
+    const grant = [...started.store.records.values()].filter((r) => r.model === 'Grant').at(-1)!;
+    expect(Math.round((grant.expiresAt - Date.now()) / 86_400_000)).toBe(60);
+  });
+
   it('keeps the defaults for an application without its own', async () => {
     const plain = { ...shortLived, client_id: 'first-party-plain' };
     delete plain['urn:seamless:access_token_ttl'];
