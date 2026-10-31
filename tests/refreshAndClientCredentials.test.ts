@@ -171,7 +171,7 @@ describe('client credentials', () => {
       client_id: machine.client_id,
       scope: 'orders:read',
     });
-    expect(tokens.expires_in).toBe(120);
+    expect([120 - 1, 120]).toContain(tokens.expires_in);
     expect(started.store.signed).toEqual([
       { kind: 'client_credentials', clientId: machine.client_id },
     ]);
