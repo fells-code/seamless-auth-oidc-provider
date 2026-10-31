@@ -146,6 +146,13 @@ and take the same client authentication as `/token`.
   (`token_revoked`).
 - **Rate limit.** 1200 requests a minute per client IP across both endpoints, per instance.
 
+## Security defaults
+
+The configuration is locked to OAuth 2.1 and RFC 9700: the code flow with `S256` PKCE for
+every client, exact redirect matching (with RFC 8252 loopback ports for native apps), refresh
+rotation, `iss` on authorization responses and audience-restricted access tokens. The full
+matrix, with the test behind each row, is in [docs/oauth-security.md](docs/oauth-security.md).
+
 ## Client authentication
 
 | Client                                    | Authentication                                |
