@@ -5,10 +5,12 @@
  */
 
 import type { OidcEdgeConfigResponse } from '@seamless-auth/types';
-import type { Configuration, FindAccount } from 'oidc-provider';
+import type { Configuration, FindAccount, KoaContextWithOIDC } from 'oidc-provider';
 
 import { createApiAdapterFactory } from './adapter.js';
 import type { OidcApiClient } from './apiClient.js';
+import type { EdgeConfigCache } from './configCache.js';
+import { FIRST_PARTY_CLIENT_PROPERTY } from './interactions.js';
 import { currentRequestContext } from './requestContext.js';
 import type { ApiSigningKey } from './signingKey.js';
 
@@ -34,6 +36,7 @@ export interface ProviderConfigurationInput {
   config: OidcEdgeConfigResponse;
   signingKeys: ApiSigningKey[];
   cookieKeys: string[];
+  configCache: EdgeConfigCache;
 }
 
 export function createFindAccount(client: OidcApiClient): FindAccount {
@@ -57,6 +60,40 @@ export function createFindAccount(client: OidcApiClient): FindAccount {
 }
 
 /**
+ * First-party clients have consent implied, so their grant is topped up with what they ask
+ * for. Third-party clients (ADR D10) see the consent page on every authorization: only the
+ * grant the interaction just produced counts, never one remembered on the provider session.
+ */
+export async function loadExistingGrant(ctx: KoaContextWithOIDC) {
+  const { oidc } = ctx;
+  const client = oidc.client;
+  if (!client) {
+    return undefined;
+  }
+  const firstParty = client[FIRST_PARTY_CLIENT_PROPERTY] === true;
+  const grantId =
+    oidc.result?.consent?.grantId ??
+    (firstParty ? oidc.session?.grantIdFor(client.clientId) : undefined);
+  if (!grantId) {
+    return undefined;
+  }
+  const grant = await oidc.provider.Grant.find(grantId);
+  if (!grant || !firstParty) {
+    return grant;
+  }
+  const granted = new Set(grant.getOIDCScope().split(' '));
+  const scopes = [...oidc.requestParamOIDCScopes].filter((scope) => !granted.has(scope));
+  const grantedClaims = new Set(grant.getOIDCClaims());
+  const claims = [...oidc.requestParamClaims].filter((claim) => !grantedClaims.has(claim));
+  if (scopes.length > 0 || claims.length > 0) {
+    grant.addOIDCScope(scopes.join(' '));
+    grant.addOIDCClaims(claims);
+    await grant.save();
+  }
+  return grant;
+}
+
+/**
  * The locked configuration from ADR 0001 (D1, D6). The API's admin routes refuse client
  * settings that would loosen it, so this is the ceiling, not a default.
  */
@@ -72,11 +109,14 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
   const signingAlgs = [activeAlg];
 
   return {
-    adapter: createApiAdapterFactory(input.client),
+    adapter: createApiAdapterFactory(input.client, input.configCache),
     findAccount: createFindAccount(input.client),
+    loadExistingGrant,
     jwks: { keys: input.signingKeys },
     responseTypes: ['code'],
     pkce: { required: () => true },
+    // Many RPs read the profile from the ID token rather than calling userinfo.
+    conformIdTokenClaims: false,
     rotateRefreshToken: true,
     enableHttpPostMethods: false,
     // TODO(#8): honour client_secret_basic and client_secret_post through verify-secret.
@@ -90,8 +130,11 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
     },
     acrValues: ['phr', 'phrh'],
     scopes: ['openid', 'offline_access', 'email', 'phone', 'seamless'],
+    // Listing claims replaces the library's defaults. The session claims sit under openid so
+    // every ID token carries the assurance the API recorded (ADR D9, D11), asked for or not.
     claims: {
-      openid: ['sub'],
+      sid: null,
+      openid: ['sub', 'acr', 'amr', 'auth_time'],
       email: ['email', 'email_verified'],
       phone: ['phone_number', 'phone_number_verified'],
       seamless: ['roles', 'org_id'],
@@ -109,6 +152,10 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
       AuthorizationCode: 60,
       IdToken: 600,
       Interaction: 600,
+      // The API hides every record whose first-party session has ended, so these are
+      // ceilings, and the session's own lifetime is what actually bounds them.
+      Grant: 1_209_600,
+      Session: 1_209_600,
     },
     cookies: {
       keys: input.cookieKeys,
@@ -116,8 +163,17 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
       long: { httpOnly: true, sameSite: 'lax', secure: true, path: '/' },
       short: { httpOnly: true, sameSite: 'lax', secure: true, path: '/' },
     },
-    // TODO(#3): the hosted UI serves this path and finishes the interaction.
+    // TODO(#3): the hosted UI serves this path.
     interactions: { url: (_ctx, interaction) => `/interaction/${interaction.uid}` },
+    clientBasedCORS: (ctx, origin, client) => {
+      if (origin === 'null') {
+        return false;
+      }
+      if (ctx.oidc.route === 'userinfo' || client.clientAuthMethod === 'none') {
+        return (client.redirectUris ?? []).some((uri) => URL.parse(uri)?.origin === origin);
+      }
+      return false;
+    },
     features: {
       devInteractions: { enabled: false },
       registration: { enabled: false },

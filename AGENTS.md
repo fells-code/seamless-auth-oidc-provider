@@ -86,8 +86,19 @@ src/
   signingKey.ts      ExternalSigningKey that signs through POST /oidc/sign
   providerConfig.ts  the locked oidc-provider configuration
   requestContext.ts  per-request context (client IP, user agent, linked session)
+  configCache.ts     the API's /oidc/config, re-read so flag changes apply without a restart
+  interactions.ts    JSON routes the hosted pages call to finish login and consent
+  firstPartySession.ts  reads the adapter's access cookie (user and first-party session)
+  originGuard.ts     same-origin check for state-changing browser routes
 tests/               vitest, against a fake API in tests/fakeApi.ts
 ```
+
+**How a provider sign-in is bound to a first-party session.** The hosted pages sign in
+through `/auth/*`, then call `POST /interaction/:uid/login`. That route reads the session id
+from the adapter's access cookie, pins it with `bindSession`, saves the Grant, and only then
+reads the auth context (the API answers only for a session holding a grant for the client).
+Every later request recovers the session from the record it acts on (`adoptSession` in the
+storage adapter), so codes, tokens and signatures all name the same `sessions` row.
 
 The `/oidc/*` contract is defined in `@seamless-auth/types` (`oidcEdge` module). Validate
 every API response with those schemas and never hand-write a duplicate type.

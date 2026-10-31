@@ -12,7 +12,8 @@ import {
 import type { Adapter, AdapterFactory, AdapterPayload } from 'oidc-provider';
 
 import type { OidcApiClient } from './apiClient.js';
-import { currentRequestContext } from './requestContext.js';
+import type { EdgeConfigCache } from './configCache.js';
+import { adoptSession, currentRequestContext } from './requestContext.js';
 
 export class ReplayDetectedError extends Error {
   constructor() {
@@ -28,10 +29,19 @@ export class UnsupportedModelError extends Error {
   }
 }
 
-function toAdapterPayload(record: OidcPayloadRecord | undefined): AdapterPayload | undefined {
+// The browser's provider session and the grant can outlive the first-party session they were
+// made under, so they only fill an empty context. Every other record is the thing the request
+// is acting on.
+const CONTEXTUAL_MODELS = new Set<OidcPayloadModel>(['Session', 'Grant']);
+
+function toAdapterPayload(
+  model: OidcPayloadModel,
+  record: OidcPayloadRecord | undefined,
+): AdapterPayload | undefined {
   if (!record) {
     return undefined;
   }
+  adoptSession(record.sessionId, !CONTEXTUAL_MODELS.has(model));
   const payload = { ...record.payload } as AdapterPayload;
   if (record.consumedAt) {
     payload.consumed = Math.floor(Date.parse(record.consumedAt) / 1000);
@@ -78,17 +88,18 @@ export class ApiPayloadAdapter implements Adapter {
   }
 
   async find(id: string): Promise<AdapterPayload | undefined> {
-    return toAdapterPayload(await this.#client.findPayload(this.#requireModel('find'), id));
+    const model = this.#requireModel('find');
+    return toAdapterPayload(model, await this.#client.findPayload(model, id));
   }
 
   async findByUserCode(userCode: string): Promise<AdapterPayload | undefined> {
     const model = this.#requireModel('findByUserCode');
-    return toAdapterPayload(await this.#client.findPayloadByUserCode(model, userCode));
+    return toAdapterPayload(model, await this.#client.findPayloadByUserCode(model, userCode));
   }
 
   async findByUid(uid: string): Promise<AdapterPayload | undefined> {
     const model = this.#requireModel('findByUid');
-    return toAdapterPayload(await this.#client.findPayloadByUid(model, uid));
+    return toAdapterPayload(model, await this.#client.findPayloadByUid(model, uid));
   }
 
   async consume(id: string): Promise<void> {
@@ -104,17 +115,31 @@ export class ApiPayloadAdapter implements Adapter {
   }
 }
 
-/** Reads clients from the API's registry. Clients are managed there, never here. */
+/**
+ * Reads clients from the API's registry. Clients are managed there, never here. A third-party
+ * client does not exist while `third_party_clients_enabled` is off (ADR D10).
+ */
 export class ApiClientAdapter implements Adapter {
   readonly #client: OidcApiClient;
+  readonly #config: EdgeConfigCache;
 
-  constructor(client: OidcApiClient) {
+  constructor(client: OidcApiClient, config: EdgeConfigCache) {
     this.#client = client;
+    this.#config = config;
   }
 
   async find(id: string): Promise<AdapterPayload | undefined> {
     const metadata = await this.#client.client(id);
-    return metadata ? ({ ...metadata } as AdapterPayload) : undefined;
+    if (!metadata) {
+      return undefined;
+    }
+    if (!metadata['urn:seamless:first_party']) {
+      const { thirdPartyClientsEnabled } = await this.#config.get();
+      if (!thirdPartyClientsEnabled) {
+        return undefined;
+      }
+    }
+    return { ...metadata } as AdapterPayload;
   }
 
   async upsert(): Promise<void> {
@@ -142,7 +167,10 @@ export class ApiClientAdapter implements Adapter {
   }
 }
 
-export function createApiAdapterFactory(client: OidcApiClient): AdapterFactory {
+export function createApiAdapterFactory(
+  client: OidcApiClient,
+  config: EdgeConfigCache,
+): AdapterFactory {
   return (name) =>
-    name === 'Client' ? new ApiClientAdapter(client) : new ApiPayloadAdapter(name, client);
+    name === 'Client' ? new ApiClientAdapter(client, config) : new ApiPayloadAdapter(name, client);
 }
