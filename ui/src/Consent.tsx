@@ -25,6 +25,7 @@ export function Consent({ details, appName, busy, onAllow, onDeny }: ConsentProp
   const scopes = details.prompt.missingScopes.length
     ? details.prompt.missingScopes
     : details.scopes;
+  const resourceScopes = new Set(details.prompt.missingResourceScopes.flatMap((r) => r.scopes));
 
   return (
     <section aria-labelledby="consent-title" className="card consent">
@@ -38,8 +39,16 @@ export function Consent({ details, appName, busy, onAllow, onDeny }: ConsentProp
       ) : null}
       <h3 className="consent-subtitle">It is asking to</h3>
       <ul className="consent-scopes">
-        {scopes.map((scope) => (
-          <li key={scope}>{describeScope(scope)}</li>
+        {scopes
+          .filter((scope) => !resourceScopes.has(scope))
+          .map((scope) => (
+            <li key={scope}>{describeScope(scope)}</li>
+          ))}
+        {details.prompt.missingResourceScopes.map(({ resource, scopes: granted }) => (
+          <li key={resource}>
+            Use <strong>{new URL(resource).host}</strong> for you
+            {granted.length > 0 ? `: ${granted.join(', ')}` : ''}
+          </li>
         ))}
       </ul>
       <p className="consent-warning">

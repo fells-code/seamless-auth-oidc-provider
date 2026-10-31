@@ -93,6 +93,24 @@ with no acr (an app code never earns an acr). The pages then read the context ag
 example a synced passkey when `phrh` was asked for, the app gets
 `unmet_authentication_requirements` rather than a token with a lower acr.
 
+## Access tokens for an API (`resource`)
+
+An app that calls an API of its own asks for a token for it with `resource=<identifier>`
+(RFC 8707), using an identifier the API's registry lists under `/admin/resources` and links to
+the application under `/admin/applications/:id/resources`. The access token is then an RFC
+9068 JWT (`typ: at+jwt`) whose `aud` is that identifier, carrying `client_id`, `sub`, `scope`
+and `jti`, with only the scopes the application is allowed there and the resource's own
+lifetime. The API checks the same links again before it signs, so an API configured for one
+identifier can reject every token minted for another.
+
+- A resource the application is not linked to is refused with `invalid_target`.
+- An app that named one resource at authorization gets its token without repeating
+  `resource` at the token endpoint.
+- Without `resource` the access token stays an opaque one for `/userinfo`, as before. A token
+  for a resource is not accepted at `/userinfo`.
+- First-party apps have the scopes granted with the sign-in. Third-party apps list them on the
+  consent page.
+
 ## Client authentication
 
 | Client                                    | Authentication                                |

@@ -8,6 +8,7 @@ import type {
   OidcAccountClaims,
   OidcAuthContext,
   OidcClientMetadata,
+  OidcClientResource,
   OidcPayloadUpsertRequest,
 } from '@seamless-auth/types';
 
@@ -38,6 +39,7 @@ export function createFakeStore() {
   const clients = new Map<string, OidcClientMetadata>();
   const accounts = new Map<string, FakeAccount>();
   const secrets = new Map<string, string>();
+  const resources = new Map<string, OidcClientResource[]>();
   const verified: { clientId: string; secret: string }[] = [];
   const signed: { kind: string; clientId: string; sessionId?: string }[] = [];
 
@@ -129,6 +131,13 @@ export function createFakeStore() {
       const found = clients.get(decodeURIComponent(match[1]!));
       return found ? json(200, found) : json(404, { error: 'Not Found' });
     }
+    match = /^\/oidc\/clients\/([^/]+)\/resources$/.exec(path);
+    if (match && method === 'GET') {
+      const clientId = decodeURIComponent(match[1]!);
+      return clients.has(clientId)
+        ? json(200, { resources: resources.get(clientId) ?? [] })
+        : json(404, { error: 'Not Found' });
+    }
     match = /^\/oidc\/clients\/([^/]+)\/verify-secret$/.exec(path);
     if (match && method === 'POST') {
       const clientId = decodeURIComponent(match[1]!);
@@ -190,6 +199,9 @@ export function createFakeStore() {
     verified,
     setSecret(clientId: string, secret: string) {
       secrets.set(clientId, secret);
+    },
+    setResources(clientId: string, list: OidcClientResource[]) {
+      resources.set(clientId, list);
     },
     addAccount(account: FakeAccount) {
       accounts.set(account.claims.sub, account);

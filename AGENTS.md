@@ -94,6 +94,7 @@ src/
   resumeCookie.ts    moves the library's resume cookie to Path=/ so it can be __Host-
   clientSecrets.ts   checks shared client secrets with the API, swaps in a one-time stand-in
   authRequirements.ts  acr_values, max_age and prompt=login against the API's auth context
+  resourceServers.ts resource indicators (RFC 8707) and JWT access tokens from the API's links
 ui/                  the hosted pages: Vite + React on @seamless-auth/react, built to dist/ui
 tests/               vitest, against a fake API in tests/fakeApi.ts
 ```

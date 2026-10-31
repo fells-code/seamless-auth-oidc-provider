@@ -11,6 +11,7 @@ export interface InteractionDetails {
     reasons: string[];
     missingScopes: string[];
     missingClaims: string[];
+    missingResourceScopes: { resource: string; scopes: string[] }[];
   };
   client: {
     id: string;
