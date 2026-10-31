@@ -23,7 +23,12 @@ import {
   isDeviceGrant,
   withLoginPrompt,
 } from './deviceFlow.js';
-import { adoptSession, currentRequestContext, markDeviceFlow } from './requestContext.js';
+import {
+  adoptSession,
+  currentRequestContext,
+  markDeviceFlow,
+  type SingleUseModel,
+} from './requestContext.js';
 
 /** A client assertion or proof presented twice. Answered as `invalid_client`, not a 500. */
 export class ReplayDetectedError extends errors.InvalidClientAuth {
@@ -34,6 +39,12 @@ export class ReplayDetectedError extends errors.InvalidClientAuth {
 }
 
 const SHARED_SECRET_METHODS = new Set(['client_secret_basic', 'client_secret_post']);
+
+const SINGLE_USE = {
+  RefreshToken: 'refresh token',
+  AuthorizationCode: 'authorization code',
+  DeviceCode: 'device code',
+} as const;
 
 export class UnsupportedModelError extends Error {
   constructor(name: string, operation: string) {
@@ -128,6 +139,10 @@ export class ApiPayloadAdapter implements Adapter {
     }
     const record = await this.#client.findPayload(model, id);
     const payload = toAdapterPayload(model, record);
+    if (context && model in SINGLE_USE && typeof payload?.grantId === 'string') {
+      context.singleUseGrants ??= new Map();
+      context.singleUseGrants.set(`${model}:${id}`, payload.grantId);
+    }
     // The library loads only opaque records. A JWT access token the edge verified on this
     // request is read like one, so introspection and revocation can see it.
     if (
@@ -181,7 +196,22 @@ export class ApiPayloadAdapter implements Adapter {
   }
 
   async consume(id: string): Promise<void> {
-    await this.#client.consumePayload(this.#requireModel('consume'), id);
+    const model = this.#requireModel('consume');
+    const consumed = await this.#client.consumePayload(model, id);
+    const label = SINGLE_USE[model as keyof typeof SINGLE_USE];
+    // The library checked `consumed` when it loaded the record, so another request can still
+    // have consumed it since. Only the API's answer says which of the two came first.
+    if (!consumed && label) {
+      const context = currentRequestContext();
+      if (context) {
+        const grantId = context.singleUseGrants?.get(`${model}:${id}`);
+        context.lostConsume = {
+          model: model as SingleUseModel,
+          ...(grantId ? { grantId } : {}),
+        };
+      }
+      throw new errors.InvalidGrant(`${label} already used`);
+    }
   }
 
   async destroy(id: string): Promise<void> {

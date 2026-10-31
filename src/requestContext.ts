@@ -23,7 +23,13 @@ export interface EdgeRequestContext {
   /** A POST to the token endpoint, where loading a device code is a poll. */
   tokenRequest?: boolean;
   devicePolled?: boolean;
+  /** A grant source another request consumed first, which makes this one a reuse. */
+  lostConsume?: { model: SingleUseModel; grantId?: string };
+  /** The grant behind each single-use record this request loaded, by `model:id`. */
+  singleUseGrants?: Map<string, string>;
 }
+
+export type SingleUseModel = 'RefreshToken' | 'AuthorizationCode' | 'DeviceCode';
 
 const storage = new AsyncLocalStorage<EdgeRequestContext>();
 
