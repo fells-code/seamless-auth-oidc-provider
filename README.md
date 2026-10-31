@@ -118,7 +118,9 @@ identifier can reject every token minted for another.
 - **Refresh.** A client registered for `refresh_token` gets one with `offline_access`, which
   the library honours only on a request with `prompt=consent` (OpenID Connect Core 11). Refresh
   tokens rotate on every use. A used one presented again revokes the grant and every token
-  under it, and the API ends the first-party session it was issued under. A refreshed ID
+  under it, and the API ends the first-party session it was issued under. Two refreshes
+  racing with the same token cannot both rotate: the API's consume says which one marked it
+  used, and the other is handled as that same reuse. A refreshed ID
   token carries the session's current `acr`, `amr` and `auth_time`, so a step-up since the
   sign-in shows up on the next refresh.
 - **Client credentials.** A confidential client registered for `client_credentials` gets an
