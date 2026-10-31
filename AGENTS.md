@@ -90,6 +90,9 @@ src/
   interactions.ts    JSON routes the hosted pages call to finish login and consent
   firstPartySession.ts  reads the adapter's access cookie (user and first-party session)
   originGuard.ts     same-origin check for state-changing browser routes
+  hostedPages.ts     serves the SPA with serve-time branding, CSP nonce and headers
+  resumeCookie.ts    moves the library's resume cookie to Path=/ so it can be __Host-
+ui/                  the hosted pages: Vite + React on @seamless-auth/react, built to dist/ui
 tests/               vitest, against a fake API in tests/fakeApi.ts
 ```
 
@@ -108,6 +111,7 @@ every API response with those schemas and never hand-write a duplicate type.
 | Task          | Command                |
 | ------------- | ---------------------- |
 | Build         | `npm run build`        |
+| Build the UI  | `npm run build:ui`     |
 | Typecheck     | `npm run typecheck`    |
 | Lint          | `npm run lint`         |
 | Format check  | `npm run format:check` |

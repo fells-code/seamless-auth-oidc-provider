@@ -17,10 +17,8 @@ import type { ApiSigningKey } from './signingKey.js';
 export const PROVIDER_COOKIE_NAMES = {
   session: '__Host-oidc_session',
   interaction: '__Host-oidc_interaction',
-  // The library sets this cookie's Path to the authorization endpoint, and a __Host-
-  // cookie must have Path=/, so it cannot take that prefix.
-  // TODO(#3): move the resume cookie to Path=/ so it can be __Host- too.
-  resume: '__Secure-oidc_resume',
+  // The library scopes this one to the resume path. hostOnlyResumeCookie moves it to Path=/.
+  resume: '__Host-oidc_resume',
 } as const;
 
 const ASYMMETRIC_ALGS = ['RS256', 'PS256', 'ES256', 'Ed25519', 'EdDSA'] as const;
@@ -173,7 +171,6 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
       long: { httpOnly: true, sameSite: 'lax', secure: true, path: '/' },
       short: { httpOnly: true, sameSite: 'lax', secure: true, path: '/' },
     },
-    // TODO(#3): the hosted UI serves this path.
     interactions: { url: (_ctx, interaction) => `/interaction/${interaction.uid}` },
     clientBasedCORS: (ctx, origin, client) => {
       if (origin === 'null') {

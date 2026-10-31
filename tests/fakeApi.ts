@@ -5,10 +5,12 @@
  */
 
 import { generateKeyPairSync, type KeyObject, sign as cryptoSign } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 import { OIDC_EDGE_CONTRACT_VERSION } from '@seamless-auth/types';
 
 export const API_URL = 'http://api.test';
+export const UI_FIXTURE_DIR = fileURLToPath(new URL('./fixtures/ui/', import.meta.url));
 export const ISSUER = 'https://login.example.com';
 export const SERVICE_SECRET = 'service-secret-that-is-at-least-32-characters';
 

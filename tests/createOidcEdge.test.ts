@@ -17,7 +17,15 @@ import { createOidcEdge } from '../src/createOidcEdge.js';
 import { buildProviderConfiguration, createFindAccount } from '../src/providerConfig.js';
 import { currentRequestContext, runWithRequestContext } from '../src/requestContext.js';
 import { ApiSigningKey } from '../src/signingKey.js';
-import { API_URL, createFakeApi, ISSUER, json, rsaKey, SERVICE_SECRET } from './fakeApi.js';
+import {
+  API_URL,
+  createFakeApi,
+  ISSUER,
+  json,
+  rsaKey,
+  SERVICE_SECRET,
+  UI_FIXTURE_DIR,
+} from './fakeApi.js';
 
 const options = {
   apiUrl: API_URL,
@@ -25,6 +33,7 @@ const options = {
   cookieKeys: ['provider-cookie-key-that-is-at-least-32-chars'],
   adapterCookieSecret: 'adapter-cookie-secret-that-is-at-least-32-chars',
   fetchAdapterManifest: false,
+  uiDir: UI_FIXTURE_DIR,
 };
 
 const servers: { close: () => void }[] = [];

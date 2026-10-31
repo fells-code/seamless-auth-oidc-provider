@@ -5,6 +5,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 import { createSeamlessAuthServer } from '@seamless-auth/express';
 import type { OidcEdgeConfigResponse } from '@seamless-auth/types';
@@ -13,9 +14,12 @@ import Provider from 'oidc-provider';
 
 import { OidcApiClient } from './apiClient.js';
 import { EdgeConfigCache } from './configCache.js';
+import { createHostedPagesRouter } from './hostedPages.js';
 import { createInteractionRouter } from './interactions.js';
-import { buildProviderConfiguration } from './providerConfig.js';
+import { createSameOriginGuard } from './originGuard.js';
+import { buildProviderConfiguration, PROVIDER_COOKIE_NAMES } from './providerConfig.js';
 import { runWithRequestContext } from './requestContext.js';
+import { hostOnlyResumeCookie } from './resumeCookie.js';
 import { signingKeysFrom } from './signingKey.js';
 import { checkApiCompatibility } from './startup.js';
 
@@ -48,6 +52,8 @@ export interface OidcEdgeOptions {
   trustProxy?: boolean;
   /** `false` keeps the adapter on its bundled route manifest. */
   fetchAdapterManifest?: boolean;
+  /** The built hosted pages. Defaults to the copy this package ships in `dist/ui`. */
+  uiDir?: string;
   fetch?: typeof fetch;
 }
 
@@ -83,6 +89,7 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
     }),
   );
   provider.proxy = options.trustProxy === true;
+  provider.use(hostOnlyResumeCookie(PROVIDER_COOKIE_NAMES.resume, '/authorize'));
   // The library answers a bare server_error and logs nothing, so this is the only trace.
   provider.on('server_error', (_ctx, error: Error) => {
     console.error(`[oidc-provider] ${error.name}: ${error.message}`);
@@ -115,8 +122,11 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
     );
   });
 
+  const sameOrigin = createSameOriginGuard(issuerUrl.origin);
+
   router.use(
     '/auth',
+    sameOrigin,
     createSeamlessAuthServer({
       authServerUrl: options.apiUrl,
       audience: options.apiIssuer ?? options.apiUrl,
@@ -142,6 +152,13 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
       issuerOrigin: issuerUrl.origin,
       adapterCookieSecret: options.adapterCookieSecret,
       accessCookieName: ADAPTER_COOKIE_NAMES.access,
+    }),
+  );
+
+  router.use(
+    createHostedPagesRouter({
+      uiDir: options.uiDir ?? fileURLToPath(new URL('./ui/', import.meta.url)),
+      configCache,
     }),
   );
 

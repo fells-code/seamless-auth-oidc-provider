@@ -7,6 +7,7 @@ RUN npm ci --ignore-scripts
 
 COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
+COPY ui ./ui
 RUN npm run build && npm prune --omit=dev
 
 # ---------- Runtime stage ----------
