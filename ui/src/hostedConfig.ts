@@ -6,6 +6,7 @@
 
 export interface HostedConfig {
   appName: string;
+  logoUrl?: string;
 }
 
 /** Branding the edge writes into the page at serve time. */
@@ -20,7 +21,9 @@ export function readHostedConfig(): HostedConfig {
       'appName' in parsed &&
       typeof parsed.appName === 'string'
     ) {
-      return { appName: parsed.appName };
+      const logoUrl =
+        'logoUrl' in parsed && typeof parsed.logoUrl === 'string' ? parsed.logoUrl : undefined;
+      return { appName: parsed.appName, ...(logoUrl ? { logoUrl } : {}) };
     }
   } catch {
     // Fall through to the default.

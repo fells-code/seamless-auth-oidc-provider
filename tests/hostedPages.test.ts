@@ -11,7 +11,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { OidcApiClient } from '../src/apiClient.js';
 import { EdgeConfigCache } from '../src/configCache.js';
-import { contentSecurityPolicy, createHostedPagesRouter, inlineJson } from '../src/hostedPages.js';
+import {
+  brandingStyle,
+  contentSecurityPolicy,
+  createHostedPagesRouter,
+  inlineJson,
+} from '../src/hostedPages.js';
 import { FakeBrowser, sendToEdge } from './browser.js';
 import {
   API_URL,
@@ -101,6 +106,43 @@ describe('hosted pages', () => {
     expect(page).toContain('\\u003c/script\\u003e');
   });
 
+  it('apply hosted_ui branding: name, logo, palette and fonts', async () => {
+    const hostedUi = {
+      appName: 'Acme',
+      logoUrl: 'https://cdn.example.com/brand/logo.svg',
+      colors: { primary: '#123456', muted: '#5f6368' },
+      fontFamily: "'Inter', system-ui",
+    };
+    const config = { ...EDGE_CONFIG, hostedUi };
+    const { base } = await startEdge(config);
+    const page = await sendToEdge(base, '/login');
+
+    const csp = String(page.headers['content-security-policy']);
+    expect(csp).toContain("img-src 'self' data: https://cdn.example.com;");
+    expect(page.text).toContain('<title>Sign in to Acme</title>');
+    expect(page.text).toContain(
+      '{"appName":"Acme","logoUrl":"https://cdn.example.com/brand/logo.svg"}',
+    );
+    expect(page.text).toContain(
+      `<style nonce="${nonceFrom(csp)}" id="seamless-palette">:root:root{--seamless-color-primary:#123456;--seamless-color-muted:#5f6368;color-scheme:light;--seamless-font-family:'Inter', system-ui}</style>`,
+    );
+  });
+
+  it('refuse branding the API should never have sent, rather than inject it', async () => {
+    const api = createFakeApi();
+    api.on(({ path }) =>
+      path === '/oidc/config'
+        ? json(200, { ...EDGE_CONFIG, hostedUi: { colors: { primary: 'red}*{x:y' } } })
+        : undefined,
+    );
+    const client = new OidcApiClient({
+      apiUrl: API_URL,
+      serviceSecret: SERVICE_SECRET,
+      fetch: api.fetch,
+    });
+    await expect(client.config()).rejects.toThrow();
+  });
+
   it('refuse a template without the head placeholder', () => {
     const client = new OidcApiClient({ apiUrl: API_URL, serviceSecret: SERVICE_SECRET });
     expect(() =>
@@ -123,6 +165,27 @@ describe('inlineJson', () => {
 describe('contentSecurityPolicy', () => {
   it('only lets styles with the nonce run inline', () => {
     expect(contentSecurityPolicy('n0nce')).toContain("style-src 'self' 'nonce-n0nce'");
+  });
+
+  it('allows images from the logo origin only', () => {
+    expect(contentSecurityPolicy('n', 'https://cdn.example.com:8443/a/logo.png?v=1')).toContain(
+      "img-src 'self' data: https://cdn.example.com:8443;",
+    );
+    expect(contentSecurityPolicy('n')).toContain("img-src 'self' data:;");
+  });
+});
+
+describe('brandingStyle', () => {
+  it('is absent without branding', () => {
+    expect(brandingStyle(undefined)).toBeUndefined();
+    expect(brandingStyle({ appName: 'Acme' })).toBeUndefined();
+  });
+
+  it('keeps the dark palette when only fonts are branded', () => {
+    expect(brandingStyle({ fontFamily: 'Georgia, serif' })).toEqual({
+      css: ':root:root{--seamless-font-family:Georgia, serif}',
+      palette: false,
+    });
   });
 });
 
