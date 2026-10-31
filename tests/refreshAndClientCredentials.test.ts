@@ -11,6 +11,7 @@ import * as oidc from 'openid-client';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { FakeBrowser } from './browser.js';
+import { ISSUER } from './fakeApi.js';
 import {
   firstParty,
   follow,
@@ -175,6 +176,24 @@ describe('client credentials', () => {
     expect(started.store.signed).toEqual([
       { kind: 'client_credentials', clientId: machine.client_id },
     ]);
+  });
+
+  it('issues the token for the built-in notices resource the API lists', async () => {
+    const notices = `${ISSUER}/seamless`;
+    started.store.setResources(machine.client_id, [
+      { identifier: notices, scopes: ['notices:send'], accessTokenTtlSeconds: null },
+      { identifier: ORDERS, scopes: ['orders:read'], accessTokenTtlSeconds: null },
+    ]);
+    const tokens = await oidc.clientCredentialsGrant(config, {
+      scope: 'notices:send',
+      resource: notices,
+    });
+    expect(payloadOf(tokens.access_token)).toMatchObject({
+      aud: notices,
+      sub: machine.client_id,
+      client_id: machine.client_id,
+      scope: 'notices:send',
+    });
   });
 
   it('needs the resource named once the client has several', async () => {

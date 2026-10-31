@@ -122,7 +122,9 @@ identifier can reject every token minted for another.
 - **Client credentials.** A confidential client registered for `client_credentials` gets an
   RFC 9068 JWT whose `sub` and `client_id` are the client itself, only ever for a resource:
   the one named with `resource`, or the client's only linked resource. Scopes are cut to what
-  the client is allowed there.
+  the client is allowed there. An application with account notices turned on also gets the
+  built-in `<issuer>/seamless` resource with `notices:send`, which the API lists for it, for
+  `POST /applications/account-notices` on the API.
 
 ## Client authentication
 
