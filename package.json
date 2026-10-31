@@ -89,7 +89,7 @@
     "@seamless-auth/react": "^0.19.1",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
-    "@types/node": "^24.19.2",
+    "@types/node": "^26.6.5",
     "@types/oidc-provider": "~9.13.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
