@@ -7,10 +7,11 @@
 import { createPublicKey, type JsonWebKey, type KeyObject } from 'node:crypto';
 
 import type { OidcJwksResponse, OidcPublicJwk, OidcSignKind } from '@seamless-auth/types';
-import { ExternalSigningKey } from 'oidc-provider';
+import { errors, ExternalSigningKey } from 'oidc-provider';
 
 import type { OidcApiClient } from './apiClient.js';
 import { DEVICE_CODE_GRANT } from './deviceFlow.js';
+import { OidcSignRefusedError } from './errors.js';
 import { currentRequestContext } from './requestContext.js';
 
 export class UnsignableTokenError extends Error {
@@ -128,7 +129,7 @@ export class ApiSigningKey extends ExternalSigningKey {
     const sessionId = currentRequestContext()?.sessionId;
     const { kind, clientId } = classifyToken(header, decodePart(payloadPart), sessionId);
     const context = currentRequestContext();
-    const { signature } = await this.#client.sign({
+    const { signature } = await this.#signOrRefuse({
       kind,
       kid: this.#kid,
       clientId,
@@ -139,6 +140,19 @@ export class ApiSigningKey extends ExternalSigningKey {
         : { grantType: context?.deviceFlow ? DEVICE_CODE_GRANT : 'authorization_code' }),
     });
     return Buffer.from(signature, 'base64url');
+  }
+
+  // A session that ended while the request ran (a concurrent refresh found reuse, say) is
+  // a grant that is no longer valid, which the client should hear as such, not a 500.
+  async #signOrRefuse(body: Parameters<OidcApiClient['sign']>[0]) {
+    try {
+      return await this.#client.sign(body);
+    } catch (error) {
+      if (error instanceof OidcSignRefusedError && error.code === 'session_revoked') {
+        throw new errors.InvalidGrant('the session behind this grant has ended');
+      }
+      throw error;
+    }
   }
 }
 

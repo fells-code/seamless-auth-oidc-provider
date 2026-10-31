@@ -11,7 +11,7 @@ import * as oidc from 'openid-client';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { FakeBrowser } from './browser.js';
-import { ISSUER } from './fakeApi.js';
+import { ISSUER, json } from './fakeApi.js';
 import {
   firstParty,
   follow,
@@ -105,6 +105,60 @@ describe('refresh token rotation', () => {
     await expect(oidc.refreshTokenGrant(config, second.refresh_token!)).rejects.toMatchObject({
       error: 'invalid_grant',
     });
+  });
+
+  it('treats a refresh that loses the consume to a concurrent one as reuse', async () => {
+    const first = await signInWithOfflineAccess();
+    // The API's answer when another refresh with this token consumed it between this
+    // request's read and its consume.
+    started.api.on(({ path }) =>
+      path.startsWith('/oidc/payloads/RefreshToken/') && path.endsWith('/consume')
+        ? json(200, { consumed: false })
+        : undefined,
+    );
+
+    await expect(oidc.refreshTokenGrant(config, first.refresh_token!)).rejects.toMatchObject({
+      error: 'invalid_grant',
+    });
+    expect(started.store.revokedSessions).toEqual([
+      { sessionId: SESSION, reason: 'refresh_token_reuse' },
+    ]);
+  });
+
+  it('revokes the grant when a concurrent request redeemed the code first', async () => {
+    const flow = await startAuthorization(config, refreshing);
+    const landed = await follow(browser, flow.url.href);
+    signIn(browser);
+    const login = await browser.post(`/interaction/${interactionUid(landed)}/login`);
+    const callback = await follow(browser, login.json<{ redirectTo: string }>().redirectTo);
+    started.api.on(({ path }) =>
+      path.startsWith('/oidc/payloads/AuthorizationCode/') && path.endsWith('/consume')
+        ? json(200, { consumed: false })
+        : undefined,
+    );
+
+    await expect(
+      oidc.authorizationCodeGrant(config, callback, {
+        pkceCodeVerifier: flow.codeVerifier,
+        expectedState: flow.state,
+        expectedNonce: flow.nonce,
+      }),
+    ).rejects.toMatchObject({ error: 'invalid_grant' });
+    const grants = [...started.store.records.values()].filter((r) => r.model === 'Grant');
+    expect(grants).toEqual([]);
+    expect(started.store.revokedSessions).toEqual([]);
+  });
+
+  it('lets only one of two concurrent refreshes with the same token rotate', async () => {
+    const first = await signInWithOfflineAccess();
+    const results = await Promise.allSettled([
+      oidc.refreshTokenGrant(config, first.refresh_token!),
+      oidc.refreshTokenGrant(config, first.refresh_token!),
+    ]);
+    expect(results.filter((result) => result.status === 'fulfilled').length).toBeLessThanOrEqual(1);
+    expect(started.store.revokedSessions).toEqual([
+      { sessionId: SESSION, reason: 'refresh_token_reuse' },
+    ]);
   });
 
   it('carries a later step-up into the refreshed ID token', async () => {

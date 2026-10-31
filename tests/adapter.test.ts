@@ -113,6 +113,7 @@ describe('ApiPayloadAdapter', () => {
 
   it('consumes, destroys and revokes by grant', async () => {
     const { api, client } = setup();
+    api.on(({ path }) => (path.endsWith('/consume') ? json(200, { consumed: true }) : undefined));
     const adapter = new ApiPayloadAdapter('RefreshToken', client);
     await adapter.consume('r1');
     await adapter.destroy('r1');
@@ -122,6 +123,27 @@ describe('ApiPayloadAdapter', () => {
       'DELETE /oidc/payloads/RefreshToken/r1',
       'DELETE /oidc/payloads/RefreshToken/by-grant/g1',
     ]);
+  });
+
+  it('refuses a single-use record another request consumed first, and marks the request', async () => {
+    const { api, client } = setup();
+    api.on(({ path }) => (path.endsWith('/consume') ? json(200, { consumed: false }) : undefined));
+
+    for (const [model, label] of [
+      ['RefreshToken', 'refresh token'],
+      ['AuthorizationCode', 'authorization code'],
+      ['DeviceCode', 'device code'],
+    ] as const) {
+      await runWithRequestContext({ correlationId: 'c' }, async () => {
+        await expect(new ApiPayloadAdapter(model, client).consume('x')).rejects.toMatchObject({
+          error: 'invalid_grant',
+          error_detail: `${label} already used`,
+        });
+        expect(currentRequestContext()?.lostConsume).toEqual({ model });
+      });
+    }
+    // Other models are not grant sources, so a lost consume there changes nothing.
+    await expect(new ApiPayloadAdapter('Session', client).consume('s')).resolves.toBeUndefined();
   });
 
   it('adopts the session a record was stored with', async () => {
