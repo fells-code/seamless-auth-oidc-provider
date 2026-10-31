@@ -39,29 +39,36 @@ export interface ProviderConfigurationInput {
   configCache: EdgeConfigCache;
 }
 
+// The routes where the library loads the browser session's account before the grant.
+const AUTHORIZATION_ROUTES = new Set(['authorization', 'resume']);
+
 export function createFindAccount(client: OidcApiClient): FindAccount {
   return async (ctx, sub) => {
     // The API releases claims only for the session and client this request serves.
     const clientId = ctx.oidc?.client?.clientId;
     const sessionId = currentRequestContext()?.sessionId;
-    if (!clientId || !sessionId) {
-      return undefined;
+    const claims =
+      clientId && sessionId ? await client.account(sub, { clientId, sessionId }) : undefined;
+    if (claims) {
+      const { org_id, ...rest } = claims;
+      return {
+        accountId: claims.sub,
+        claims: () => ({ ...rest, ...(org_id ? { org_id } : {}) }),
+      };
     }
-    const claims = await client.account(sub, { clientId, sessionId });
-    if (!claims) {
-      return undefined;
+    // A client this session has not used yet has no grant, so the API will not describe the
+    // account. At authorization the library only needs to know the provider session's own
+    // account; claims are read at the token and userinfo endpoints, once the grant exists.
+    if (AUTHORIZATION_ROUTES.has(ctx.oidc?.route) && ctx.oidc.session?.accountId === sub) {
+      return { accountId: sub, claims: () => ({ sub }) };
     }
-    const { org_id, ...rest } = claims;
-    return {
-      accountId: claims.sub,
-      claims: () => ({ ...rest, ...(org_id ? { org_id } : {}) }),
-    };
+    return undefined;
   };
 }
 
 /**
- * First-party clients have consent implied, so their grant is topped up with what they ask
- * for. Third-party clients (ADR D10) see the consent page on every authorization: only the
+ * First-party clients have consent implied, so their grant is created or topped up with what
+ * they ask for. Third-party clients (ADR D10) see the consent page on every authorization: only the
  * grant the interaction just produced counts, never one remembered on the provider session.
  */
 export async function loadExistingGrant(ctx: KoaContextWithOIDC) {
@@ -74,10 +81,13 @@ export async function loadExistingGrant(ctx: KoaContextWithOIDC) {
   const grantId =
     oidc.result?.consent?.grantId ??
     (firstParty ? oidc.session?.grantIdFor(client.clientId) : undefined);
-  if (!grantId) {
+  const accountId = oidc.session?.accountId;
+  if (!grantId && !(firstParty && accountId)) {
     return undefined;
   }
-  const grant = await oidc.provider.Grant.find(grantId);
+  const grant = grantId
+    ? await oidc.provider.Grant.find(grantId)
+    : new oidc.provider.Grant({ accountId, clientId: client.clientId });
   if (!grant || !firstParty) {
     return grant;
   }
@@ -85,7 +95,7 @@ export async function loadExistingGrant(ctx: KoaContextWithOIDC) {
   const scopes = [...oidc.requestParamOIDCScopes].filter((scope) => !granted.has(scope));
   const grantedClaims = new Set(grant.getOIDCClaims());
   const claims = [...oidc.requestParamClaims].filter((claim) => !grantedClaims.has(claim));
-  if (scopes.length > 0 || claims.length > 0) {
+  if (!grantId || scopes.length > 0 || claims.length > 0) {
     grant.addOIDCScope(scopes.join(' '));
     grant.addOIDCClaims(claims);
     await grant.save();

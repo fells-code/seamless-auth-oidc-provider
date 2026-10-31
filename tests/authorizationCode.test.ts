@@ -35,6 +35,13 @@ const firstParty: OidcClientMetadata = {
   'urn:seamless:first_party': true,
 };
 
+const otherFirstParty: OidcClientMetadata = {
+  ...firstParty,
+  client_id: 'first-party-calendar',
+  client_name: 'Example Calendar',
+  redirect_uris: ['https://calendar.example.com/callback'],
+};
+
 const thirdParty: OidcClientMetadata = {
   ...firstParty,
   client_id: 'third-party-spa',
@@ -56,6 +63,7 @@ async function startEdge(config = EDGE_CONFIG) {
     request.path === '/oidc/config' ? json(200, config) : store.handle(request),
   );
   store.addClient(firstParty);
+  store.addClient(otherFirstParty);
   store.addClient(thirdParty);
   store.addAccount({
     sessionId: SESSION,
@@ -230,6 +238,36 @@ describe('authorization code with PKCE', () => {
     const again = await startAuthorization(config, firstParty);
     const silent = await follow(browser, again.url.href);
     expect(silent.origin + silent.pathname).toBe(REDIRECT);
+  });
+
+  it('signs the same browser in to a second first-party app with no interaction', async () => {
+    const config = await relyingParty(started.base, firstParty);
+    const { url } = await startAuthorization(config, firstParty);
+    const uid = interactionUid(await follow(browser, url.href));
+    signIn(browser);
+    const login = await browser.post(`/interaction/${uid}/login`);
+    await follow(browser, login.json<{ redirectTo: string }>().redirectTo);
+
+    const otherConfig = await relyingParty(started.base, otherFirstParty);
+    const other = await startAuthorization(otherConfig, otherFirstParty);
+    const callback = await follow(browser, other.url.href);
+    expect(callback.origin + callback.pathname).toBe(otherFirstParty.redirect_uris[0]);
+    const tokens = await oidc.authorizationCodeGrant(otherConfig, callback, {
+      pkceCodeVerifier: other.codeVerifier,
+      expectedState: other.state,
+      expectedNonce: other.nonce,
+    });
+    expect(tokens.claims()).toMatchObject({
+      sub: USER,
+      aud: otherFirstParty.client_id,
+      email: 'ada@example.com',
+      acr: 'phrh',
+    });
+    const grants = [...started.store.records.values()].filter((r) => r.model === 'Grant');
+    expect(new Set(grants.map((g) => g.payload.clientId))).toEqual(
+      new Set([firstParty.client_id, otherFirstParty.client_id]),
+    );
+    expect(grants.every((g) => g.sessionId === SESSION)).toBe(true);
   });
 
   it('refuses PKCE-less requests', async () => {

@@ -83,6 +83,10 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
     }),
   );
   provider.proxy = options.trustProxy === true;
+  // The library answers a bare server_error and logs nothing, so this is the only trace.
+  provider.on('server_error', (_ctx, error: Error) => {
+    console.error(`[oidc-provider] ${error.name}: ${error.message}`);
+  });
 
   const issuerUrl = new URL(config.issuer);
   const router = express.Router();
