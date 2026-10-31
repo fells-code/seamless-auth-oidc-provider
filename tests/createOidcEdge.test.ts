@@ -27,6 +27,8 @@ import {
   UI_FIXTURE_DIR,
 } from './fakeApi.js';
 
+const renderPage = async () => ({ html: '', headers: {} });
+
 const options = {
   apiUrl: API_URL,
   serviceSecret: SERVICE_SECRET,
@@ -222,7 +224,14 @@ describe('buildProviderConfiguration', () => {
 
   it('needs a signing key with a supported alg', () => {
     expect(() =>
-      buildProviderConfiguration({ client, config, configCache, signingKeys: [], cookieKeys: [] }),
+      buildProviderConfiguration({
+        client,
+        renderPage,
+        config,
+        configCache,
+        signingKeys: [],
+        cookieKeys: [],
+      }),
     ).toThrow(/No provider signing key/);
   });
 
@@ -232,6 +241,7 @@ describe('buildProviderConfiguration', () => {
     expect(() =>
       buildProviderConfiguration({
         client,
+        renderPage,
         config,
         configCache,
         signingKeys: [key],
@@ -244,6 +254,7 @@ describe('buildProviderConfiguration', () => {
     const { jwk } = rsaKey('k');
     const configuration = buildProviderConfiguration({
       client,
+      renderPage,
       config,
       configCache,
       signingKeys: [new ApiSigningKey({ ...jwk, kid: 'k', alg: 'RS256' }, client, true)],

@@ -22,8 +22,10 @@ import {
   unmetRequirements,
 } from './authRequirements.js';
 import type { EdgeConfigCache } from './configCache.js';
+import type { HostedPageRenderer } from './hostedPages.js';
 import { FIRST_PARTY_CLIENT_PROPERTY } from './interactions.js';
 import { storeJwtAccessToken } from './jwtAccessTokens.js';
+import { createLogoutPages } from './logout.js';
 import { currentRequestContext } from './requestContext.js';
 import { createResourceIndicators, DEFAULT_ACCESS_TOKEN_TTL } from './resourceServers.js';
 import type { ApiSigningKey } from './signingKey.js';
@@ -49,6 +51,7 @@ export interface ProviderConfigurationInput {
   signingKeys: ApiSigningKey[];
   cookieKeys: string[];
   configCache: EdgeConfigCache;
+  renderPage: HostedPageRenderer;
 }
 
 // The routes where the library loads the browser session's account before the grant.
@@ -311,7 +314,8 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
     features: {
       devInteractions: { enabled: false },
       registration: { enabled: false },
-      backchannelLogout: { enabled: false },
+      // The API sends the logout tokens (see leaveBackchannelLogoutToApi).
+      backchannelLogout: { enabled: true },
       externalSigningSupport: { enabled: true, ack: 'experimental-01' },
       resourceIndicators: {
         enabled: true,
@@ -322,8 +326,7 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
         getResourceServerInfo: resourceIndicators.getResourceServerInfo,
       },
       clientCredentials: { enabled: true },
-      // TODO(#5): RP-initiated logout through the hosted UI.
-      rpInitiatedLogout: { enabled: false },
+      rpInitiatedLogout: { enabled: true, ...createLogoutPages(input.renderPage) },
       introspection: { enabled: true, allowedPolicy: createIntrospectionPolicy(input.client) },
       revocation: { enabled: true },
       // TODO(#7): device flow, first-party clients only.

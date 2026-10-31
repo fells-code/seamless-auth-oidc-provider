@@ -90,7 +90,8 @@ src/
   interactions.ts    JSON routes the hosted pages call to finish login and consent
   firstPartySession.ts  reads the adapter's access cookie (user and first-party session)
   originGuard.ts     same-origin check for state-changing browser routes
-  hostedPages.ts     serves the SPA with serve-time branding, CSP nonce and headers
+  hostedPages.ts     serves the SPA with serve-time branding, CSP nonce and headers, and
+                     renders it for pages the library owns (logout)
   resumeCookie.ts    moves the library's resume cookie to Path=/ so it can be __Host-
   clientSecrets.ts   checks shared client secrets with the API, swaps in a one-time stand-in
   authRequirements.ts  acr_values, max_age and prompt=login against the API's auth context
@@ -98,6 +99,7 @@ src/
   refreshReuse.ts    ends the first-party session when a rotated refresh token is reused
   jwtAccessTokens.ts stores JWT access tokens by jti so introspection and revocation see them
   tokenAudit.ts      records revocations in the API's audit log
+  logout.ts          RP-initiated logout pages, and ending the first-party session with it
   rateLimit.ts       per-IP limit on introspection and revocation
 ui/                  the hosted pages: Vite + React on @seamless-auth/react, built to dist/ui
 tests/               vitest, against a fake API in tests/fakeApi.ts
