@@ -33,6 +33,7 @@ import type { ApiSigningKey } from './signingKey.js';
 import {
   accessTokenTtl,
   CLIENT_TTL_PROPERTIES,
+  grantTtl,
   idTokenTtl,
   refreshTokenTtl,
 } from './tokenLifetimes.js';
@@ -311,7 +312,7 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
       Interaction: 600,
       // The API hides every record whose first-party session has ended, so these are
       // ceilings, and the session's own lifetime is what actually bounds them.
-      Grant: 1_209_600,
+      Grant: grantTtl,
       Session: 1_209_600,
     },
     cookies: {

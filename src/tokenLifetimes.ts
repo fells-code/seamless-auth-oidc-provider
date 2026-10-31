@@ -44,6 +44,18 @@ export function idTokenTtl(_ctx: KoaContextWithOIDC, _token: unknown, client: Cl
   return clientTtl(client, CLIENT_TTL_PROPERTIES.idToken) ?? DEFAULT_ID_TOKEN_TTL;
 }
 
+/** At least as long as the application's refresh tokens, which the grant must outlive. */
+export function grantLifetime(client: unknown): number {
+  return Math.max(
+    DEFAULT_REFRESH_TOKEN_TTL,
+    clientTtl(client as ClientLike | undefined, CLIENT_TTL_PROPERTIES.refreshToken) ?? 0,
+  );
+}
+
+export function grantTtl(ctx: KoaContextWithOIDC | undefined): number {
+  return grantLifetime(ctx?.oidc?.client);
+}
+
 /**
  * The application's lifetime, or the library's 14 days. As the library does, a rotated token
  * for a browser app that cannot bind it to a key keeps what was left of the one it replaces,
