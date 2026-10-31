@@ -25,7 +25,9 @@ export function auditRevocations(client: OidcApiClient) {
     const kind = REVOCABLE.find((name) => entities[name]);
     const token = kind ? entities[kind] : undefined;
     const context = currentRequestContext();
-    if (!kind || !token || !context) {
+    // The library answers 200 without revoking a public client's request for another
+    // client's token, so only a token the caller owns was revoked.
+    if (!kind || !token || !context || token.clientId !== ctx.oidc.client?.clientId) {
       return;
     }
     try {

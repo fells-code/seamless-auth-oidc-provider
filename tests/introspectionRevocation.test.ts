@@ -18,6 +18,7 @@ import {
   firstParty,
   follow,
   interactionUid,
+  otherFirstParty,
   relyingParty,
   SESSION,
   signIn,
@@ -168,6 +169,16 @@ describe('introspection and revocation', () => {
     ) as { jti: string };
     expect(await oidc.tokenIntrospection(app, jti)).toEqual({ active: false });
     await expect(oidc.fetchUserInfo(app, jti, USER)).rejects.toThrow();
+  });
+
+  it("records nothing when a public client presents another app's token", async () => {
+    const tokens = await userTokens({ scope: 'openid offline_access', prompt: 'consent' });
+    const other = await relyingParty(started.base, otherFirstParty);
+    await oidc.tokenRevocation(other, tokens.refresh_token!);
+    expect(started.store.events).toEqual([]);
+    expect(await oidc.tokenIntrospection(app, tokens.refresh_token!)).toMatchObject({
+      active: true,
+    });
   });
 
   it('revokes a JWT access token by its jti', async () => {
