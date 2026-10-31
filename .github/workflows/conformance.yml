@@ -1,0 +1,129 @@
+name: OpenID conformance
+
+# The OpenID Foundation conformance suite against this service, the API behind it and
+# Postgres, all built from source. See conformance/README.md for the plans, the expected
+# results and how to run it locally.
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'ui/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'conformance/**'
+      - '.github/workflows/conformance.yml'
+  schedule:
+    - cron: '41 4 * * *'
+  workflow_dispatch:
+    inputs:
+      api-ref:
+        description: 'seamless-auth-api ref to test against (default: main)'
+        required: false
+        default: ''
+      plans:
+        description: 'Comma separated plan ids from conformance/plans.json (default: every enabled plan)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  conformance:
+    name: OpenID conformance suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      API_DIR: ${{ github.workspace }}/api
+      RUN_DIR: ${{ github.workspace }}/conformance/.run
+      HUSKY: '0'
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Checkout the API
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: fells-code/seamless-auth-api
+          ref: ${{ inputs.api-ref }}
+          path: api
+
+      - name: Pull the conformance suite
+        working-directory: conformance/suite
+        run: docker compose pull --quiet
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            api/package-lock.json
+            conformance/package-lock.json
+
+      - name: Build the API
+        working-directory: api
+        run: npm ci && npm run build
+
+      - name: Build this service
+        run: npm ci && npm run build
+
+      - name: Cache the Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('conformance/package-lock.json') }}
+
+      - name: Install the runner
+        working-directory: conformance
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Start the stack
+        run: |
+          conformance/stack/start.sh
+          node conformance/stack/seed.mjs
+
+      - name: Start the conformance suite
+        working-directory: conformance/suite
+        run: |
+          docker compose up -d --wait mongodb
+          docker compose up -d
+          for _ in $(seq 1 90); do
+            curl -ksf -o /dev/null https://localhost:8443/api/runner/available && exit 0
+            sleep 2
+          done
+          docker compose logs server | tail -n 60
+          exit 1
+
+      - name: Run the plans
+        working-directory: conformance
+        env:
+          # The suite serves a self-signed certificate on localhost.
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+          PLANS: ${{ inputs.plans }}
+        run: node runner/run.mjs
+
+      - name: Collect logs
+        if: always()
+        run: |
+          mkdir -p "${RUN_DIR}/results"
+          cp "${RUN_DIR}"/*.log "${RUN_DIR}/results/" 2>/dev/null || true
+          (cd conformance/suite && docker compose logs --no-color server > "${RUN_DIR}/results/suite-server.log" 2>&1) || true
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: openid-conformance-results
+          path: conformance/.run/results/
+          if-no-files-found: ignore
+          retention-days: 14

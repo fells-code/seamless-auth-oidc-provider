@@ -1,0 +1,64 @@
+[
+  {
+    "id": "config",
+    "planName": "oidcc-config-certification-test-plan",
+    "config": "config",
+    "profile": "Config OP"
+  },
+  {
+    "id": "basic",
+    "planName": "oidcc-basic-certification-test-plan",
+    "variant": {
+      "server_metadata": "discovery",
+      "client_registration": "static_client"
+    },
+    "config": "basic",
+    "profile": "Basic OP"
+  },
+  {
+    "id": "formpost",
+    "planName": "oidcc-formpost-basic-certification-test-plan",
+    "variant": {
+      "server_metadata": "discovery",
+      "client_registration": "static_client"
+    },
+    "config": "basic",
+    "profile": "Form Post OP"
+  },
+  {
+    "id": "pkjwt",
+    "planName": "oidcc-test-plan",
+    "variant": {
+      "client_registration": "static_client",
+      "client_auth_type": "private_key_jwt",
+      "response_type": "code",
+      "response_mode": "default"
+    },
+    "config": "pkjwt",
+    "note": "Not a certification profile: the oidcc suite with private_key_jwt, the default client authentication here."
+  },
+  {
+    "id": "rp-logout",
+    "planName": "oidcc-rp-initiated-logout-certification-test-plan",
+    "variant": {
+      "client_registration": "static_client",
+      "response_type": "code"
+    },
+    "config": "basic",
+    "profile": "RP-Initiated OP",
+    "enabled": false,
+    "note": "Enable with RP-initiated logout (oidc-provider#5)."
+  },
+  {
+    "id": "backchannel-logout",
+    "planName": "oidcc-backchannel-rp-initiated-logout-certification-test-plan",
+    "variant": {
+      "client_registration": "static_client",
+      "response_type": "code"
+    },
+    "config": "basic",
+    "profile": "Back-Channel OP",
+    "enabled": false,
+    "note": "Enable with back-channel logout (oidc-provider#5). Needs backchannelLogoutUri on the seeded clients."
+  }
+]
