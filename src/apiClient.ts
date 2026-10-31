@@ -26,6 +26,7 @@ import {
   OidcEdgeRoutes,
   type OidcJwksResponse,
   OidcJwksResponseSchema,
+  OidcPayloadConsumeResponseSchema,
   type OidcPayloadModel,
   type OidcPayloadRecord,
   OidcPayloadRecordSchema,
@@ -134,10 +135,14 @@ export class OidcApiClient {
     });
   }
 
-  async consumePayload(model: OidcPayloadModel, id: string): Promise<void> {
-    await this.#request('POST', routePath(OidcEdgeRoutes.payloadConsume, { model, id }), {
-      allowNotFound: true,
-    });
+  /** True only if this call consumed the record. A record that is gone was not consumed here. */
+  async consumePayload(model: OidcPayloadModel, id: string): Promise<boolean> {
+    const result = await this.#request(
+      'POST',
+      routePath(OidcEdgeRoutes.payloadConsume, { model, id }),
+      { schema: OidcPayloadConsumeResponseSchema, allowNotFound: true },
+    );
+    return result?.consumed === true;
   }
 
   async destroyPayload(model: OidcPayloadModel, id: string): Promise<void> {
