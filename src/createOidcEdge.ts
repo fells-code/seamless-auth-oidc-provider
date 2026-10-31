@@ -13,6 +13,7 @@ import express, { type Router } from 'express';
 import Provider from 'oidc-provider';
 
 import { OidcApiClient } from './apiClient.js';
+import { verifyClientSecrets } from './clientSecrets.js';
 import { EdgeConfigCache } from './configCache.js';
 import { createHostedPagesRouter } from './hostedPages.js';
 import { createInteractionRouter } from './interactions.js';
@@ -90,6 +91,7 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
   );
   provider.proxy = options.trustProxy === true;
   provider.use(hostOnlyResumeCookie(PROVIDER_COOKIE_NAMES.resume, '/authorize'));
+  provider.use(verifyClientSecrets(client));
   // The library answers a bare server_error and logs nothing, so this is the only trace.
   provider.on('server_error', (_ctx, error: Error) => {
     console.error(`[oidc-provider] ${error.name}: ${error.message}`);

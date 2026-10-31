@@ -17,7 +17,7 @@ any OIDC app ──► seamless-auth-oidc-provider (public: OIDC endpoints, host
 - Holds no private keys and no database. The API signs every token after checking its claims,
   and stores all provider state.
 - Code flow with PKCE only, refresh rotation always on, `private_key_jwt` for confidential
-  clients.
+  clients, and shared secrets only for clients opted in on the API.
 
 The design is in
 [ADR 0001](https://github.com/fells-code/seamless-auth-api/blob/main/docs/adr/0001-openid-provider.md).
@@ -74,6 +74,19 @@ has the provider disabled or speaks a different version of the `/oidc/*` contrac
 The interaction routes are for the hosted pages only. A state change needs `Sec-Fetch-Site:
 same-origin` or an `Origin` equal to the issuer's, so a page on a sibling subdomain cannot
 drive them.
+
+## Client authentication
+
+| Client                                    | Authentication                                |
+| ----------------------------------------- | --------------------------------------------- |
+| Confidential (server-side apps, services) | `private_key_jwt`, each assertion used once   |
+| Public (SPA, native, CLI)                 | `none`, with PKCE                             |
+| Confidential, opted in to a shared secret | `client_secret_basic` or `client_secret_post` |
+
+Shared secrets are for apps that support nothing else. They need `allow_client_secrets` on
+the API (read when this service starts) and a per-client opt-in there. This service never
+holds a client's secret: it asks the API to check a presented one, then hands the library a
+one-time stand-in for that request. `client_secret_jwt` and HS\* algorithms are never offered.
 
 ## Hosted pages
 

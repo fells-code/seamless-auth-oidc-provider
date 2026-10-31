@@ -14,6 +14,8 @@ export interface EdgeRequestContext {
   sessionId?: string;
   /** Set when a verified first-party session named `sessionId`, so stored records cannot. */
   sessionBound?: boolean;
+  /** The one-time stand-in for a client secret the API verified on this request. */
+  verifiedClientSecret?: { clientId: string; value: string };
 }
 
 const storage = new AsyncLocalStorage<EdgeRequestContext>();

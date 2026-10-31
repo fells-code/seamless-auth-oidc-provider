@@ -104,9 +104,13 @@ export async function startEdge(config = EDGE_CONFIG) {
   return { api, store, base, edge };
 }
 
-export async function relyingParty(base: string, client: OidcClientMetadata) {
+export async function relyingParty(
+  base: string,
+  client: OidcClientMetadata,
+  clientAuth: oidc.ClientAuth = oidc.None(),
+) {
   const fetch = edgeFetch(base);
-  const config = await oidc.discovery(new URL(ISSUER), client.client_id, undefined, oidc.None(), {
+  const config = await oidc.discovery(new URL(ISSUER), client.client_id, undefined, clientAuth, {
     [oidc.customFetch]: fetch,
   });
   config[oidc.customFetch] = fetch;

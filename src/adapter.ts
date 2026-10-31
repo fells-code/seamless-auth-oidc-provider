@@ -4,23 +4,29 @@
  * See LICENSE file in the project root for full license information
  */
 
+import { randomBytes } from 'node:crypto';
+
 import {
   type OidcPayloadModel,
   OidcPayloadModelSchema,
   type OidcPayloadRecord,
 } from '@seamless-auth/types';
 import type { Adapter, AdapterFactory, AdapterPayload } from 'oidc-provider';
+import { errors } from 'oidc-provider';
 
 import type { OidcApiClient } from './apiClient.js';
 import type { EdgeConfigCache } from './configCache.js';
 import { adoptSession, currentRequestContext } from './requestContext.js';
 
-export class ReplayDetectedError extends Error {
+/** A client assertion or proof presented twice. Answered as `invalid_client`, not a 500. */
+export class ReplayDetectedError extends errors.InvalidClientAuth {
   constructor() {
-    super('A replay detection record already exists for this assertion');
+    super('a replay detection record already exists for this assertion');
     this.name = 'ReplayDetectedError';
   }
 }
+
+const SHARED_SECRET_METHODS = new Set(['client_secret_basic', 'client_secret_post']);
 
 export class UnsupportedModelError extends Error {
   constructor(name: string, operation: string) {
@@ -118,6 +124,10 @@ export class ApiPayloadAdapter implements Adapter {
 /**
  * Reads clients from the API's registry. Clients are managed there, never here. A third-party
  * client does not exist while `third_party_clients_enabled` is off (ADR D10).
+ *
+ * The registry never returns a secret. A client on a shared-secret method gets the one-time
+ * value `verifyClientSecrets` set for a secret the API accepted on this request, and otherwise
+ * a random value nothing can present, which the library needs to load the client at all.
  */
 export class ApiClientAdapter implements Adapter {
   readonly #client: OidcApiClient;
@@ -139,7 +149,15 @@ export class ApiClientAdapter implements Adapter {
         return undefined;
       }
     }
-    return { ...metadata } as AdapterPayload;
+    if (!SHARED_SECRET_METHODS.has(metadata.token_endpoint_auth_method)) {
+      return { ...metadata } as AdapterPayload;
+    }
+    const verified = currentRequestContext()?.verifiedClientSecret;
+    const secret =
+      verified?.clientId === metadata.client_id
+        ? verified.value
+        : randomBytes(32).toString('base64url');
+    return { ...metadata, client_secret: secret } as AdapterPayload;
   }
 
   async upsert(): Promise<void> {
