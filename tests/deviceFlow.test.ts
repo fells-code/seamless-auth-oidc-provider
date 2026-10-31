@@ -329,6 +329,30 @@ describe('device authorization grant', () => {
 });
 
 describe('DevicePollThrottle', () => {
+  it('holds at most ten thousand codes, dropping the oldest', () => {
+    let clock = 0;
+    const throttle = new DevicePollThrottle(() => clock);
+    for (let i = 0; i < 10_001; i += 1) throttle.check(`code-${i}`);
+    clock = 1000;
+    // The oldest was dropped, so it starts again rather than being told to slow down.
+    expect(() => throttle.check('code-0')).not.toThrow();
+    expect(() => throttle.check('code-10000')).toThrow(/slow_down/);
+  });
+
+  it('does not track a device code that does not exist', async () => {
+    const started = await startEdge();
+    started.store.addClient(tv);
+    const form = { client_id: tv.client_id, grant_type: DEVICE_CODE_GRANT, device_code: 'nope' };
+    for (let i = 0; i < 2; i += 1) {
+      const response = await sendToEdge(started.base, '/token', {
+        method: 'POST',
+        headers: FORM,
+        body: new URLSearchParams(form).toString(),
+      });
+      expect(response.json()).toMatchObject({ error: 'invalid_grant' });
+    }
+  });
+
   it('keeps each device code to its own interval', () => {
     let clock = 0;
     const throttle = new DevicePollThrottle(() => clock);

@@ -56,6 +56,8 @@ export function withLoginPrompt(prompt: unknown): string {
  * Per device code, per instance. The library has no polling interval of its own, so a
  * client polling sooner than `interval` is told `slow_down` and its interval grows.
  */
+const MAX_TRACKED_CODES = 10_000;
+
 export class DevicePollThrottle {
   readonly #polls = new Map<string, { at: number; interval: number }>();
   readonly #now: () => number;
@@ -66,12 +68,19 @@ export class DevicePollThrottle {
 
   check(deviceCode: string): void {
     const now = this.#now();
-    if (this.#polls.size > 10_000) {
+    if (this.#polls.size >= MAX_TRACKED_CODES) {
       for (const [code, poll] of this.#polls) {
         if (now - poll.at > DEVICE_CODE_TTL_SECONDS * 1000) this.#polls.delete(code);
       }
+      // Still full of live entries: drop the oldest, so the map has a hard ceiling.
+      for (const code of this.#polls.keys()) {
+        if (this.#polls.size < MAX_TRACKED_CODES) break;
+        this.#polls.delete(code);
+      }
     }
     const last = this.#polls.get(deviceCode);
+    // Deleted first so the Map's insertion order stays oldest-poll first.
+    this.#polls.delete(deviceCode);
     if (last && now - last.at < last.interval * 1000) {
       this.#polls.set(deviceCode, {
         at: now,
@@ -86,11 +95,15 @@ export class DevicePollThrottle {
   }
 }
 
-/** Marks token endpoint posts, and adds `interval` to the device authorization response. */
-export function deviceFlowMiddleware(tokenPath: string) {
+/**
+ * Marks token endpoint posts, and adds `interval` to the device authorization response. The
+ * provider is mounted at the issuer's path, so paths here are relative to it, and the
+ * library's router ignores case.
+ */
+export function deviceFlowMiddleware(tokenPath = '/token') {
   return async (ctx: KoaContextWithOIDC, next: () => Promise<unknown>) => {
     const context = currentRequestContext();
-    if (context && ctx.method === 'POST' && ctx.path === tokenPath) {
+    if (context && ctx.method === 'POST' && ctx.path.toLowerCase() === tokenPath) {
       context.tokenRequest = true;
     }
     await next();
