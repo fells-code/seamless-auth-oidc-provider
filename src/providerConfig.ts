@@ -24,6 +24,7 @@ import {
 import type { EdgeConfigCache } from './configCache.js';
 import { FIRST_PARTY_CLIENT_PROPERTY } from './interactions.js';
 import { currentRequestContext } from './requestContext.js';
+import { createResourceServerInfo, DEFAULT_ACCESS_TOKEN_TTL } from './resourceServers.js';
 import type { ApiSigningKey } from './signingKey.js';
 
 export const PROVIDER_COOKIE_NAMES = {
@@ -105,7 +106,19 @@ export async function loadExistingGrant(ctx: KoaContextWithOIDC) {
   const scopes = [...oidc.requestParamOIDCScopes].filter((scope) => !granted.has(scope));
   const grantedClaims = new Set(grant.getOIDCClaims());
   const claims = [...oidc.requestParamClaims].filter((claim) => !grantedClaims.has(claim));
-  if (!grantId || scopes.length > 0 || claims.length > 0) {
+  let resourcesChanged = false;
+  for (const [indicator, server] of Object.entries(oidc.resourceServers ?? {})) {
+    const offered = new Set((server.scope ?? '').split(' '));
+    const held = new Set((grant.getResourceScope(indicator) ?? '').split(' '));
+    const missing = [...oidc.requestParamScopes].filter(
+      (scope) => offered.has(scope) && !held.has(scope),
+    );
+    if (missing.length > 0) {
+      grant.addResourceScope(indicator, missing.join(' '));
+      resourcesChanged = true;
+    }
+  }
+  if (!grantId || scopes.length > 0 || claims.length > 0 || resourcesChanged) {
     grant.addOIDCScope(scopes.join(' '));
     grant.addOIDCClaims(claims);
     await grant.save();
@@ -238,7 +251,9 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
       end_session: '/session/end',
     },
     ttl: {
-      AccessToken: 600,
+      // A number here would override the resource's own lifetime.
+      AccessToken: (_ctx, token) =>
+        token.resourceServer?.accessTokenTTL ?? DEFAULT_ACCESS_TOKEN_TTL,
       AuthorizationCode: 60,
       IdToken: 600,
       Interaction: 600,
@@ -271,6 +286,15 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
       registration: { enabled: false },
       backchannelLogout: { enabled: false },
       externalSigningSupport: { enabled: true, ack: 'experimental-01' },
+      resourceIndicators: {
+        enabled: true,
+        // Without a resource the access token stays an opaque one for userinfo, as before.
+        defaultResource: (_ctx, _client, oneOf) => oneOf,
+        // An RP that named one resource at authorization gets a token for it without repeating
+        // it at the token endpoint, which many RP libraries never do.
+        useGrantedResource: () => true,
+        getResourceServerInfo: createResourceServerInfo(input.client, activeAlg),
+      },
       // TODO(#4): client credentials with resource scopes.
       clientCredentials: { enabled: false },
       // TODO(#5): RP-initiated logout through the hosted UI.

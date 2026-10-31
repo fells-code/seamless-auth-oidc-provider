@@ -18,6 +18,8 @@ import {
   OidcAuthContextSchema,
   type OidcClientMetadata,
   OidcClientMetadataSchema,
+  type OidcClientResource,
+  OidcClientResourcesResponseSchema,
   type OidcEdgeConfigResponse,
   OidcEdgeConfigResponseSchema,
   type OidcEdgeEvent,
@@ -176,6 +178,15 @@ export class OidcApiClient {
       schema: OidcClientMetadataSchema,
       allowNotFound: true,
     });
+  }
+
+  /** An API from before this route, or a client that is not active, has none. */
+  async clientResources(id: string): Promise<OidcClientResource[]> {
+    const result = await this.#request('GET', routePath(OidcEdgeRoutes.clientResources, { id }), {
+      schema: OidcClientResourcesResponseSchema,
+      allowNotFound: true,
+    });
+    return result?.resources ?? [];
   }
 
   async verifySecret(id: string, secret: string): Promise<boolean> {

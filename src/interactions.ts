@@ -120,6 +120,9 @@ export function createInteractionRouter(options: InteractionRouterOptions): Rout
           reasons: interaction.prompt.reasons,
           missingScopes: details.missingOIDCScope ?? [],
           missingClaims: details.missingOIDCClaims ?? [],
+          missingResourceScopes: Object.entries(details.missingResourceScopes ?? {}).map(
+            ([resource, scopes]) => ({ resource, scopes }),
+          ),
         },
         client: {
           id: found.clientId,
