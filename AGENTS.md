@@ -23,7 +23,8 @@ in seamless-auth-api. Read it before changing anything here. The parts that bind
 - **Sign-in is first-party sign-in.** The hosted pages sign users in through the same JSON
   routes every SDK app uses, through this service's own `@seamless-auth/express` adapter, so
   decoys, lockout and rate limits apply unchanged.
-- **The configuration is locked** (ADR D1, #410): code flow only, PKCE for every client,
+- **The configuration is locked** (ADR D1, #410): code flow only, PKCE for every client
+  (a confidential client the API opts out sends `nonce` instead, unless that is waived too),
   refresh rotation always on, no dev interactions, no dynamic registration, no
   `client_secret_jwt` or HS\* algorithms.
 
