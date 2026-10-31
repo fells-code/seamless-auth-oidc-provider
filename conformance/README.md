@@ -22,6 +22,13 @@ copies that passkey into each module's fresh browser, as the suite expects a new
 module. When a module asks for a screenshot (the provider's own error page, or the second
 login for `prompt=login` and `max_age`), the runner uploads the page it acted on.
 
+The OIDCC plans send no `code_challenge`, and one module sends no `nonce`, so the suite's
+clients are seeded with the per-application PKCE and nonce opt-out. `conformance-pkce` keeps
+both requirements. Before the plans, the runner sends each a plain authorization request:
+the job fails if `conformance-pkce` is not refused, and the outcome for the other clients
+picks the expectations marked `"when": "pkce-opt-out"` or `"when": "pkce-required"` (an API
+without the opt-out, where every client requires PKCE).
+
 A module fails the job when it ends `FAILED`, is interrupted or times out and is not listed
 in `expected.json`, or when a listed expectation no longer happens. `WARNING`, `REVIEW` and
 `SKIPPED` results pass, and the ones we know about are listed with their reason so the
