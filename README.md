@@ -111,6 +111,21 @@ identifier can reject every token minted for another.
 - First-party apps have the scopes granted with the sign-in. Third-party apps list them on the
   consent page.
 
+## Refresh tokens and client credentials
+
+- **Refresh.** A client registered for `refresh_token` gets one with `offline_access`, which
+  the library honours only on a request with `prompt=consent` (OpenID Connect Core 11). Refresh
+  tokens rotate on every use. A used one presented again revokes the grant and every token
+  under it, and the API ends the first-party session it was issued under. A refreshed ID
+  token carries the session's current `acr`, `amr` and `auth_time`, so a step-up since the
+  sign-in shows up on the next refresh.
+- **Client credentials.** A confidential client registered for `client_credentials` gets an
+  RFC 9068 JWT whose `sub` and `client_id` are the client itself, only ever for a resource:
+  the one named with `resource`, or the client's only linked resource. Scopes are cut to what
+  the client is allowed there. An application with account notices turned on also gets the
+  built-in `<issuer>/seamless` resource with `notices:send`, which the API lists for it, for
+  `POST /applications/account-notices` on the API.
+
 ## Client authentication
 
 | Client                                    | Authentication                                |

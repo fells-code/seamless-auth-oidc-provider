@@ -24,7 +24,7 @@ import {
 import type { EdgeConfigCache } from './configCache.js';
 import { FIRST_PARTY_CLIENT_PROPERTY } from './interactions.js';
 import { currentRequestContext } from './requestContext.js';
-import { createResourceServerInfo, DEFAULT_ACCESS_TOKEN_TTL } from './resourceServers.js';
+import { createResourceIndicators, DEFAULT_ACCESS_TOKEN_TTL } from './resourceServers.js';
 import type { ApiSigningKey } from './signingKey.js';
 
 export const PROVIDER_COOKIE_NAMES = {
@@ -204,6 +204,7 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
     throw new Error(`The active provider key uses unsupported alg ${activeAlg}`);
   }
   const signingAlgs = [activeAlg];
+  const resourceIndicators = createResourceIndicators(input.client, activeAlg);
 
   return {
     adapter: createApiAdapterFactory(input.client, input.configCache),
@@ -288,15 +289,13 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
       externalSigningSupport: { enabled: true, ack: 'experimental-01' },
       resourceIndicators: {
         enabled: true,
-        // Without a resource the access token stays an opaque one for userinfo, as before.
-        defaultResource: (_ctx, _client, oneOf) => oneOf,
+        defaultResource: resourceIndicators.defaultResource,
         // An RP that named one resource at authorization gets a token for it without repeating
         // it at the token endpoint, which many RP libraries never do.
         useGrantedResource: () => true,
-        getResourceServerInfo: createResourceServerInfo(input.client, activeAlg),
+        getResourceServerInfo: resourceIndicators.getResourceServerInfo,
       },
-      // TODO(#4): client credentials with resource scopes.
-      clientCredentials: { enabled: false },
+      clientCredentials: { enabled: true },
       // TODO(#5): RP-initiated logout through the hosted UI.
       rpInitiatedLogout: { enabled: false },
       // TODO(#6): introspection and revocation.
