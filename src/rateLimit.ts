@@ -9,6 +9,8 @@ import type { NextFunction, Request, Response } from 'express';
 export interface RateLimitOptions {
   limit: number;
   windowMs: number;
+  /** Defaults to the client IP. */
+  key?: (req: Request) => string;
 }
 
 /**
@@ -16,7 +18,7 @@ export interface RateLimitOptions {
  * limit of its own on reads, so this keeps one caller from turning these endpoints into a
  * load generator against it.
  */
-export function createRateLimiter({ limit, windowMs }: RateLimitOptions) {
+export function createRateLimiter({ limit, windowMs, key: keyOf }: RateLimitOptions) {
   const windows = new Map<string, { count: number; resetAt: number }>();
 
   return (req: Request, res: Response, next: NextFunction) => {
@@ -26,7 +28,7 @@ export function createRateLimiter({ limit, windowMs }: RateLimitOptions) {
         if (window.resetAt <= now) windows.delete(key);
       }
     }
-    const key = req.ip ?? 'unknown';
+    const key = keyOf ? keyOf(req) : (req.ip ?? 'unknown');
     let window = windows.get(key);
     if (!window || window.resetAt <= now) {
       window = { count: 0, resetAt: now + windowMs };

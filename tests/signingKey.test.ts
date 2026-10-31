@@ -96,6 +96,7 @@ describe('ApiSigningKey.sign', () => {
       kid: 'active',
       clientId: 'app',
       sessionId: 's1',
+      grantType: 'authorization_code',
       signingInput: input,
     });
     const publicKey = createPublicKey({ key: api.active.jwk, format: 'jwk' });

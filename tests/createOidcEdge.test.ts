@@ -7,6 +7,7 @@
 import { request as httpRequest } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
+import { OIDC_EDGE_CONTRACT_VERSION } from '@seamless-auth/types';
 import express from 'express';
 import type { KoaContextWithOIDC } from 'oidc-provider';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -135,7 +136,7 @@ describe('createOidcEdge', () => {
     expect(discovery.token_endpoint_auth_methods_supported).not.toContain('client_secret_jwt');
     expect(discovery.token_endpoint_auth_signing_alg_values_supported).not.toContain('HS256');
     expect(discovery).not.toHaveProperty('registration_endpoint');
-    expect(discovery).not.toHaveProperty('device_authorization_endpoint');
+    expect(discovery.device_authorization_endpoint).toBe(`${ISSUER}/device/auth`);
   });
 
   it('publishes the API keys, active first, with no private members', async () => {
@@ -185,7 +186,7 @@ describe('createOidcEdge', () => {
     api.on(({ path }) =>
       path === '/oidc/config'
         ? json(200, {
-            contractVersion: 1,
+            contractVersion: OIDC_EDGE_CONTRACT_VERSION,
             issuer: `${ISSUER}/oidc`,
             appName: 'x',
             allowClientSecrets: false,
@@ -214,7 +215,7 @@ describe('createOidcEdge', () => {
 describe('buildProviderConfiguration', () => {
   const client = new OidcApiClient({ apiUrl: API_URL, serviceSecret: SERVICE_SECRET });
   const config = {
-    contractVersion: 1,
+    contractVersion: OIDC_EDGE_CONTRACT_VERSION,
     issuer: ISSUER,
     appName: 'x',
     allowClientSecrets: false,

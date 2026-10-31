@@ -100,6 +100,7 @@ src/
   jwtAccessTokens.ts stores JWT access tokens by jti so introspection and revocation see them
   tokenAudit.ts      records revocations in the API's audit log
   logout.ts          RP-initiated logout pages, and ending the first-party session with it
+  deviceFlow.ts      device grant pages, poll throttle, D10 rules for device-flow tokens
   rateLimit.ts       per-IP limit on introspection and revocation
 ui/                  the hosted pages: Vite + React on @seamless-auth/react, built to dist/ui
 tests/               vitest, against a fake API in tests/fakeApi.ts
