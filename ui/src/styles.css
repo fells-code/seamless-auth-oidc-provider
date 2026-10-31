@@ -4,7 +4,10 @@
  * See LICENSE file in the project root for full license information
  */
 
-/* Branding overrides these at serve time. Every default pair meets WCAG 2.2 AA contrast. */
+/*
+ * Branding overrides these at serve time. Every default pair meets WCAG 2.2 AA contrast.
+ * The --seamless-* names without -color- are the bundled sign-in screens' own.
+ */
 :root {
   --seamless-color-background: #f5f6f8;
   --seamless-color-surface: #ffffff;
@@ -16,11 +19,19 @@
   --seamless-color-focus: #1f4fd1;
   --seamless-font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --seamless-radius: 10px;
+  --seamless-accent: var(--seamless-color-primary);
+  --seamless-accent-contrast: var(--seamless-color-on-primary);
+  --seamless-text: var(--seamless-color-text);
+  --seamless-text-muted: var(--seamless-color-muted);
+  --seamless-surface: var(--seamless-color-surface);
+  --seamless-surface-raised: var(--seamless-color-background);
+  --seamless-border: var(--seamless-color-border);
   color-scheme: light;
 }
 
+/* A branded palette was chosen against a light page, so it replaces this one. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(:has(#seamless-palette)) {
     --seamless-color-background: #121417;
     --seamless-color-surface: #1c1f24;
     --seamless-color-text: #f1f3f5;
@@ -59,6 +70,14 @@ body {
 
 .brand {
   text-align: center;
+}
+
+.brand-logo {
+  display: block;
+  max-width: 12rem;
+  max-height: 3rem;
+  margin: 0 auto 0.5rem;
+  object-fit: contain;
 }
 
 .brand-name {

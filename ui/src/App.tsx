@@ -14,11 +14,11 @@ import { Layout } from './Layout';
 import { Resume } from './Resume';
 
 export function App() {
-  const { appName } = readHostedConfig();
+  const { appName, logoUrl } = readHostedConfig();
   const origin = window.location.origin;
   return (
     <AuthProvider apiHost={origin} magicLinkRedirectUri={`${origin}/verify-magiclink`}>
-      <Layout appName={appName}>
+      <Layout appName={appName} logoUrl={logoUrl}>
         <Routes>
           <Route path="/" element={<Resume />} />
           <Route path="/interaction/:uid" element={<InteractionPage appName={appName} />} />

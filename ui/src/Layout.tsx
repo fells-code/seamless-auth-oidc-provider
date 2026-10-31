@@ -8,11 +8,20 @@ import type { ReactNode } from 'react';
 
 import { pendingInteraction } from './interactionApi';
 
-export function Layout({ appName, children }: { appName: string; children: ReactNode }) {
+export function Layout({
+  appName,
+  logoUrl,
+  children,
+}: {
+  appName: string;
+  logoUrl?: string;
+  children: ReactNode;
+}) {
   const pending = pendingInteraction();
   return (
     <div className="page">
       <header className="brand">
+        {logoUrl ? <img className="brand-logo" src={logoUrl} alt="" /> : null}
         <h1 className="brand-name">{appName}</h1>
         {pending ? (
           <p className="brand-context">
