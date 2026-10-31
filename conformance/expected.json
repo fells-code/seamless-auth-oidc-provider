@@ -3,31 +3,36 @@
     "plan": "basic",
     "module": "oidcc-server",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-userinfo-get",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-userinfo-post-header",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-userinfo-post-body",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-ensure-request-without-nonce-succeeds-for-code-flow",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
@@ -39,7 +44,8 @@
     "plan": "basic",
     "module": "oidcc-scope-email",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
@@ -51,7 +57,8 @@
     "plan": "basic",
     "module": "oidcc-scope-phone",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
@@ -63,97 +70,113 @@
     "plan": "basic",
     "module": "oidcc-alternate-happy-flow",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-display-page",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-display-popup",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-prompt-login",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-prompt-none-not-logged-in",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-prompt-none-logged-in",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-max-age-1",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-max-age-10000",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-ensure-request-with-unknown-parameter-succeeds",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-id-token-hint",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-login-hint",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-ui-locales",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-claims-locales",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-ensure-request-with-acr-values-succeeds",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-codereuse",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-codereuse-30seconds",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
@@ -165,13 +188,15 @@
     "plan": "basic",
     "module": "oidcc-ensure-post-request-succeeds",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
     "module": "oidcc-server-client-secret-post",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
@@ -183,7 +208,8 @@
     "plan": "basic",
     "module": "oidcc-claims-essential",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "basic",
@@ -195,37 +221,43 @@
     "plan": "basic",
     "module": "oidcc-refresh-token",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-server",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-userinfo-get",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-userinfo-post-header",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-userinfo-post-body",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-ensure-request-without-nonce-succeeds-for-code-flow",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
@@ -237,7 +269,8 @@
     "plan": "formpost",
     "module": "oidcc-scope-email",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
@@ -249,7 +282,8 @@
     "plan": "formpost",
     "module": "oidcc-scope-phone",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
@@ -261,97 +295,113 @@
     "plan": "formpost",
     "module": "oidcc-alternate-happy-flow",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-display-page",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-display-popup",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-prompt-login",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-prompt-none-not-logged-in",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-prompt-none-logged-in",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-max-age-1",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-max-age-10000",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-ensure-request-with-unknown-parameter-succeeds",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-id-token-hint",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-login-hint",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-ui-locales",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-claims-locales",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-ensure-request-with-acr-values-succeeds",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-codereuse",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-codereuse-30seconds",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
@@ -363,13 +413,15 @@
     "plan": "formpost",
     "module": "oidcc-ensure-post-request-succeeds",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
     "module": "oidcc-server-client-secret-post",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
@@ -381,7 +433,8 @@
     "plan": "formpost",
     "module": "oidcc-claims-essential",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "formpost",
@@ -393,31 +446,36 @@
     "plan": "formpost",
     "module": "oidcc-refresh-token",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-server",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-refresh-token",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-ensure-request-without-nonce-succeeds-for-code-flow",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-claims-essential",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
@@ -435,13 +493,15 @@
     "plan": "pkjwt",
     "module": "oidcc-scope-email",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-scope-phone",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
@@ -453,103 +513,120 @@
     "plan": "pkjwt",
     "module": "oidcc-alternate-happy-flow",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-prompt-login",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-prompt-none-logged-in",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-prompt-none-not-logged-in",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-claims-locales",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-id-token-hint",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-login-hint",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-max-age-1",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-max-age-10000",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-userinfo-get",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-userinfo-post-body",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-userinfo-post-header",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-ensure-request-with-acr-values-succeeds",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-ensure-request-with-unknown-parameter-succeeds",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-ui-locales",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-display-page",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-display-popup",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
@@ -567,19 +644,22 @@
     "plan": "pkjwt",
     "module": "oidcc-ensure-client-assertion-with-iss-aud-succeeds",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-codereuse",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
     "module": "oidcc-codereuse-30seconds",
     "result": "FAILED",
-    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request."
+    "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",
+    "when": "pkce-required"
   },
   {
     "plan": "pkjwt",
@@ -598,5 +678,131 @@
     "module": "oidcc-redirect-uri-query-added",
     "result": "REVIEW",
     "reason": "Error page for a redirect_uri with an extra query, screenshot uploaded for review."
+  },
+  {
+    "plan": "basic",
+    "module": "oidcc-scope-email",
+    "result": "WARNING",
+    "when": "pkce-opt-out",
+    "reason": "WARNING: email is in the ID token for scope=email (conformIdTokenClaims is off, deliberately, so relying parties get it without a userinfo call)."
+  },
+  {
+    "plan": "basic",
+    "module": "oidcc-scope-phone",
+    "result": "WARNING",
+    "when": "pkce-opt-out",
+    "reason": "WARNING: the test account has no phone number, so userinfo has no phone claims for scope=phone."
+  },
+  {
+    "plan": "basic",
+    "module": "oidcc-alternate-happy-flow",
+    "result": "WARNING",
+    "when": "pkce-opt-out",
+    "reason": "WARNING: email is in the ID token for scope=email (conformIdTokenClaims is off, deliberately)."
+  },
+  {
+    "plan": "basic",
+    "module": "oidcc-prompt-login",
+    "result": "REVIEW",
+    "when": "pkce-opt-out",
+    "reason": "Second sign-in page, screenshot uploaded for review."
+  },
+  {
+    "plan": "basic",
+    "module": "oidcc-max-age-1",
+    "result": "REVIEW",
+    "when": "pkce-opt-out",
+    "reason": "Second sign-in page after max_age expired, screenshot uploaded for review."
+  },
+  {
+    "plan": "basic",
+    "module": "oidcc-claims-essential",
+    "result": "WARNING",
+    "when": "pkce-opt-out",
+    "reason": "WARNING: the claims parameter is off and accounts have no name, so userinfo has no name."
+  },
+  {
+    "plan": "formpost",
+    "module": "oidcc-scope-email",
+    "result": "WARNING",
+    "when": "pkce-opt-out",
+    "reason": "WARNING: email is in the ID token for scope=email (conformIdTokenClaims is off, deliberately, so relying parties get it without a userinfo call)."
+  },
+  {
+    "plan": "formpost",
+    "module": "oidcc-scope-phone",
+    "result": "WARNING",
+    "when": "pkce-opt-out",
+    "reason": "WARNING: the test account has no phone number, so userinfo has no phone claims for scope=phone."
+  },
+  {
+    "plan": "formpost",
+    "module": "oidcc-alternate-happy-flow",
+    "result": "WARNING",
+    "when": "pkce-opt-out",
+    "reason": "WARNING: email is in the ID token for scope=email (conformIdTokenClaims is off, deliberately)."
+  },
+  {
+    "plan": "formpost",
+    "module": "oidcc-prompt-login",
+    "result": "REVIEW",
+    "when": "pkce-opt-out",
+    "reason": "Second sign-in page, screenshot uploaded for review."
+  },
+  {
+    "plan": "formpost",
+    "module": "oidcc-max-age-1",
+    "result": "REVIEW",
+    "when": "pkce-opt-out",
+    "reason": "Second sign-in page after max_age expired, screenshot uploaded for review."
+  },
+  {
+    "plan": "formpost",
+    "module": "oidcc-claims-essential",
+    "result": "WARNING",
+    "when": "pkce-opt-out",
+    "reason": "WARNING: the claims parameter is off and accounts have no name, so userinfo has no name."
+  },
+  {
+    "plan": "pkjwt",
+    "module": "oidcc-claims-essential",
+    "result": "WARNING",
+    "when": "pkce-opt-out",
+    "reason": "WARNING: the claims parameter is off and accounts have no name, so userinfo has no name."
+  },
+  {
+    "plan": "pkjwt",
+    "module": "oidcc-scope-email",
+    "result": "WARNING",
+    "when": "pkce-opt-out",
+    "reason": "WARNING: email is in the ID token for scope=email (conformIdTokenClaims is off, deliberately, so relying parties get it without a userinfo call)."
+  },
+  {
+    "plan": "pkjwt",
+    "module": "oidcc-scope-phone",
+    "result": "WARNING",
+    "when": "pkce-opt-out",
+    "reason": "WARNING: the test account has no phone number, so userinfo has no phone claims for scope=phone."
+  },
+  {
+    "plan": "pkjwt",
+    "module": "oidcc-alternate-happy-flow",
+    "result": "WARNING",
+    "when": "pkce-opt-out",
+    "reason": "WARNING: email is in the ID token for scope=email (conformIdTokenClaims is off, deliberately)."
+  },
+  {
+    "plan": "pkjwt",
+    "module": "oidcc-prompt-login",
+    "result": "REVIEW",
+    "when": "pkce-opt-out",
+    "reason": "Second sign-in page, screenshot uploaded for review."
+  },
+  {
+    "plan": "pkjwt",
+    "module": "oidcc-max-age-1",
+    "result": "REVIEW",
+    "when": "pkce-opt-out",
+    "reason": "Second sign-in page after max_age expired, screenshot uploaded for review."
   }
 ]
