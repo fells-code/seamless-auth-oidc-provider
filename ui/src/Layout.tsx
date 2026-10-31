@@ -1,0 +1,33 @@
+/*
+ * Copyright © 2026 Fells Code, LLC
+ * Licensed under the Apache License, Version 2.0
+ * See LICENSE file in the project root for full license information
+ */
+
+import type { ReactNode } from 'react';
+
+import { pendingInteraction } from './interactionApi';
+
+export function Layout({ appName, children }: { appName: string; children: ReactNode }) {
+  const pending = pendingInteraction();
+  return (
+    <div className="page">
+      <header className="brand">
+        <h1 className="brand-name">{appName}</h1>
+        {pending ? (
+          <p className="brand-context">
+            Signing in to continue to <strong>{pending.clientName}</strong>
+          </p>
+        ) : null}
+        {pending?.reauthenticate ? (
+          <p className="brand-context" role="status">
+            {pending.clientName} asked you to sign in again before it continues.
+          </p>
+        ) : null}
+      </header>
+      <main className="content" id="main">
+        {children}
+      </main>
+    </div>
+  );
+}

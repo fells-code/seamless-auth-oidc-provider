@@ -23,8 +23,8 @@ The design is in
 [ADR 0001](https://github.com/fells-code/seamless-auth-api/blob/main/docs/adr/0001-openid-provider.md).
 
 > **Status:** under construction for Seamless Auth v0.21. Discovery, the authorization code
-> flow with PKCE and userinfo work. The hosted pages and the remaining grants land in the open
-> [issues](https://github.com/fells-code/seamless-auth-oidc-provider/issues).
+> flow with PKCE, userinfo and the hosted login and consent pages work. The remaining grants
+> land in the open [issues](https://github.com/fells-code/seamless-auth-oidc-provider/issues).
 
 ## Requirements
 
@@ -74,6 +74,25 @@ has the provider disabled or speaks a different version of the `/oidc/*` contrac
 The interaction routes are for the hosted pages only. A state change needs `Sec-Fetch-Site:
 same-origin` or an `Origin` equal to the issuer's, so a page on a sibling subdomain cannot
 drive them.
+
+## Hosted pages
+
+The login and consent pages are a SPA in `ui/`, built on `@seamless-auth/react` and shipped
+in `dist/ui`. They sign users in through this service's own adapter routes (`/auth/*`), the
+same way any Seamless app does, then finish the OIDC interaction.
+
+- **Methods.** Every method the API has enabled in `login_methods`, through the SDK's bundled
+  screens. A recovery session goes to enrollment before it can finish a sign-in.
+- **Consent.** First-party clients have consent implied. Third-party clients see the client
+  name, the host they are sent back to and the requested scopes, on every authorization.
+- **Branding.** The app name comes from the API's config each time a page is served, so a
+  config change needs no build and no restart.
+- **Headers.** A strict CSP (`script-src 'self'`, styles from this origin or with the
+  response's nonce, `frame-ancestors 'none'`), `no-store`, `nosniff` and `no-referrer`.
+
+Every cookie this service sets is `__Host-` (host-only, `Secure`, `Path=/`), so serve it over
+HTTPS, including in development: the library refuses to set a `Secure` cookie on a plain
+HTTP request.
 
 ## Embed in an Express app
 

@@ -1,0 +1,163 @@
+/*
+ * Copyright © 2026 Fells Code, LLC
+ * Licensed under the Apache License, Version 2.0
+ * See LICENSE file in the project root for full license information
+ */
+
+/* Branding overrides these at serve time. Every default pair meets WCAG 2.2 AA contrast. */
+:root {
+  --seamless-color-background: #f5f6f8;
+  --seamless-color-surface: #ffffff;
+  --seamless-color-text: #1a1d21;
+  --seamless-color-muted: #4a515b;
+  --seamless-color-primary: #1f4fd1;
+  --seamless-color-on-primary: #ffffff;
+  --seamless-color-border: #c4c9d1;
+  --seamless-color-focus: #1f4fd1;
+  --seamless-font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --seamless-radius: 10px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --seamless-color-background: #121417;
+    --seamless-color-surface: #1c1f24;
+    --seamless-color-text: #f1f3f5;
+    --seamless-color-muted: #b7bec8;
+    --seamless-color-primary: #8fb0ff;
+    --seamless-color-on-primary: #0b1530;
+    --seamless-color-border: #454c56;
+    --seamless-color-focus: #8fb0ff;
+    color-scheme: dark;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--seamless-color-background);
+  color: var(--seamless-color-text);
+  font-family: var(--seamless-font-family);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 2rem 1rem;
+}
+
+.brand {
+  text-align: center;
+}
+
+.brand-name {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.brand-context {
+  margin: 0.25rem 0 0;
+  color: var(--seamless-color-muted);
+}
+
+.content {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.card {
+  width: 100%;
+  max-width: 28rem;
+  padding: 1.5rem;
+  background: var(--seamless-color-surface);
+  border: 1px solid var(--seamless-color-border);
+  border-radius: var(--seamless-radius);
+}
+
+h2 {
+  margin: 0 0 1rem;
+  font-size: 1.375rem;
+  line-height: 1.3;
+}
+
+h2:focus {
+  outline: none;
+}
+
+.consent-subtitle {
+  margin: 1rem 0 0.5rem;
+  font-size: 1rem;
+}
+
+.consent-scopes {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.consent-warning {
+  margin-top: 1rem;
+  color: var(--seamless-color-muted);
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+button.primary,
+button.secondary {
+  min-height: 2.75rem;
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--seamless-radius);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button.primary {
+  background: var(--seamless-color-primary);
+  color: var(--seamless-color-on-primary);
+  border: 1px solid var(--seamless-color-primary);
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--seamless-color-text);
+  border: 1px solid var(--seamless-color-border);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+:focus-visible {
+  outline: 3px solid var(--seamless-color-focus);
+  outline-offset: 2px;
+}
+
+.status {
+  margin: 0;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
