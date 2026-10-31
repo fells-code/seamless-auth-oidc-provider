@@ -28,8 +28,14 @@ import { FIRST_PARTY_CLIENT_PROPERTY } from './interactions.js';
 import { storeJwtAccessToken } from './jwtAccessTokens.js';
 import { createLogoutPages } from './logout.js';
 import { currentRequestContext } from './requestContext.js';
-import { createResourceIndicators, DEFAULT_ACCESS_TOKEN_TTL } from './resourceServers.js';
+import { createResourceIndicators } from './resourceServers.js';
 import type { ApiSigningKey } from './signingKey.js';
+import {
+  accessTokenTtl,
+  CLIENT_TTL_PROPERTIES,
+  idTokenTtl,
+  refreshTokenTtl,
+} from './tokenLifetimes.js';
 
 export const PROVIDER_COOKIE_NAMES = {
   session: '__Host-oidc_session',
@@ -280,7 +286,9 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
       phone: ['phone_number', 'phone_number_verified'],
       seamless: ['roles', 'org_id'],
     },
-    extraClientMetadata: { properties: ['urn:seamless:first_party'] },
+    extraClientMetadata: {
+      properties: ['urn:seamless:first_party', ...Object.values(CLIENT_TTL_PROPERTIES)],
+    },
     routes: {
       authorization: '/authorize',
       token: '/token',
@@ -294,12 +302,12 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
     },
     formats: { customizers: { jwt: storeJwtAccessToken } },
     ttl: {
-      // A number here would override the resource's own lifetime.
-      AccessToken: (_ctx, token) =>
-        token.resourceServer?.accessTokenTTL ?? DEFAULT_ACCESS_TOKEN_TTL,
+      // Functions, so the resource's and the application's own lifetimes apply.
+      AccessToken: accessTokenTtl,
+      IdToken: idTokenTtl,
+      RefreshToken: refreshTokenTtl,
       AuthorizationCode: 60,
       DeviceCode: DEVICE_CODE_TTL_SECONDS,
-      IdToken: 600,
       Interaction: 600,
       // The API hides every record whose first-party session has ended, so these are
       // ceilings, and the session's own lifetime is what actually bounds them.
