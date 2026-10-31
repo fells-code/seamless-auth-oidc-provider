@@ -27,7 +27,7 @@ import type { HostedPageRenderer } from './hostedPages.js';
 import { FIRST_PARTY_CLIENT_PROPERTY } from './interactions.js';
 import { storeJwtAccessToken } from './jwtAccessTokens.js';
 import { createLogoutPages } from './logout.js';
-import { PKCE_REQUIRED_PROPERTY, pkceRequired } from './pkce.js';
+import { NONCE_REQUIRED_PROPERTY, PKCE_REQUIRED_PROPERTY, pkceRequired } from './pkce.js';
 import { currentRequestContext } from './requestContext.js';
 import { createResourceIndicators } from './resourceServers.js';
 import type { ApiSigningKey } from './signingKey.js';
@@ -292,6 +292,7 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
       properties: [
         'urn:seamless:first_party',
         PKCE_REQUIRED_PROPERTY,
+        NONCE_REQUIRED_PROPERTY,
         ...Object.values(CLIENT_TTL_PROPERTIES),
       ],
     },

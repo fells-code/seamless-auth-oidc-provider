@@ -75,6 +75,26 @@ describe('per-application PKCE opt-out', () => {
     expect(errorOf(response)).toBe('nonce is required when PKCE is not used');
   });
 
+  it('lets a client that also waived the nonce use the code flow with neither', async () => {
+    const neither = {
+      ...optedOut,
+      client_id: 'confidential-no-pkce-no-nonce',
+      'urn:seamless:nonce_required': false,
+    };
+    started.store.addClient(neither);
+    started.store.setSecret(neither.client_id, SECRET);
+    const config = await relyingParty(started.base, neither, oidc.ClientSecretBasic(SECRET));
+    const browser = new FakeBrowser(started.base);
+
+    let landed = await follow(browser, authorizationUrl(config, neither, {}).href);
+    signIn(browser);
+    const login = await browser.post(`/interaction/${interactionUid(landed)}/login`);
+    landed = await follow(browser, login.json<{ redirectTo: string }>().redirectTo);
+
+    const tokens = await oidc.authorizationCodeGrant(config, landed, { expectedState: 'state' });
+    expect(tokens.claims()?.nonce).toBeUndefined();
+  });
+
   it('still accepts PKCE from an opted-out client', async () => {
     const config = await relyingParty(started.base, optedOut, oidc.ClientSecretBasic(SECRET));
     const browser = new FakeBrowser(started.base);
@@ -109,6 +129,7 @@ describe('per-application PKCE opt-out', () => {
       ...firstParty,
       client_id: 'public-no-pkce',
       'urn:seamless:pkce_required': false,
+      'urn:seamless:nonce_required': false,
     };
     started.store.addClient(publicClient);
     const config = await relyingParty(started.base, publicClient);
