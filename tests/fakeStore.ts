@@ -37,6 +37,8 @@ export function createFakeStore() {
   const records = new Map<string, StoredRecord>();
   const clients = new Map<string, OidcClientMetadata>();
   const accounts = new Map<string, FakeAccount>();
+  const secrets = new Map<string, string>();
+  const verified: { clientId: string; secret: string }[] = [];
   const signed: { kind: string; clientId: string; sessionId?: string }[] = [];
 
   const key = (model: string, id: string) => `${model}/${id}`;
@@ -127,6 +129,13 @@ export function createFakeStore() {
       const found = clients.get(decodeURIComponent(match[1]!));
       return found ? json(200, found) : json(404, { error: 'Not Found' });
     }
+    match = /^\/oidc\/clients\/([^/]+)\/verify-secret$/.exec(path);
+    if (match && method === 'POST') {
+      const clientId = decodeURIComponent(match[1]!);
+      const { secret } = body as { secret: string };
+      verified.push({ clientId, secret });
+      return json(200, { valid: secrets.get(clientId) === secret });
+    }
     match = /^\/oidc\/accounts\/([^/]+)$/.exec(path);
     if (match && method === 'GET') {
       const account = accounts.get(decodeURIComponent(match[1]!));
@@ -177,6 +186,10 @@ export function createFakeStore() {
     signed,
     addClient(metadata: OidcClientMetadata) {
       clients.set(metadata.client_id, metadata);
+    },
+    verified,
+    setSecret(clientId: string, secret: string) {
+      secrets.set(clientId, secret);
     },
     addAccount(account: FakeAccount) {
       accounts.set(account.claims.sub, account);

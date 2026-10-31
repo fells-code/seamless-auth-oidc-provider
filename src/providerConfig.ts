@@ -127,9 +127,15 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
     conformIdTokenClaims: false,
     rotateRefreshToken: true,
     enableHttpPostMethods: false,
-    // TODO(#8): honour client_secret_basic and client_secret_post through verify-secret.
-    // Until then the API never sends a secret, so those clients fail closed.
-    clientAuthMethods: ['private_key_jwt', 'none', 'client_secret_basic', 'client_secret_post'],
+    // ADR D6. Shared secrets are offered only on an instance that allows them, and are
+    // checked by the API (verifyClientSecrets). client_secret_jwt is never offered.
+    clientAuthMethods: [
+      'private_key_jwt',
+      'none',
+      ...(input.config.allowClientSecrets
+        ? (['client_secret_basic', 'client_secret_post'] as const)
+        : []),
+    ],
     enabledJWA: {
       clientAuthSigningAlgValues: [...ASYMMETRIC_ALGS],
       requestObjectSigningAlgValues: [...ASYMMETRIC_ALGS],

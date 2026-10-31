@@ -92,6 +92,7 @@ src/
   originGuard.ts     same-origin check for state-changing browser routes
   hostedPages.ts     serves the SPA with serve-time branding, CSP nonce and headers
   resumeCookie.ts    moves the library's resume cookie to Path=/ so it can be __Host-
+  clientSecrets.ts   checks shared client secrets with the API, swaps in a one-time stand-in
 ui/                  the hosted pages: Vite + React on @seamless-auth/react, built to dist/ui
 tests/               vitest, against a fake API in tests/fakeApi.ts
 ```
