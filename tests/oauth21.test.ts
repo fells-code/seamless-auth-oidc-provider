@@ -126,12 +126,13 @@ describe('OAuth 2.1 and RFC 9700 defaults', () => {
   });
 
   it('refuses implicit, hybrid and plain PKCE requests', async () => {
-    for (const extra of [
+    const requests: Record<string, string>[] = [
       { response_type: 'token' },
       { response_type: 'id_token' },
       { response_type: 'code id_token' },
       { code_challenge_method: 'plain', code_challenge: 'x'.repeat(43) },
-    ]) {
+    ];
+    for (const extra of requests) {
       const flow = await startAuthorization(config, firstParty, extra);
       const error = errorOf(await browser.get(flow.url.href));
       expect(error, JSON.stringify(extra)).toMatch(/unsupported_response_type|invalid_request/);
