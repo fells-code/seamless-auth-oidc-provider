@@ -16,7 +16,14 @@ import { errors } from 'oidc-provider';
 
 import type { OidcApiClient } from './apiClient.js';
 import type { EdgeConfigCache } from './configCache.js';
-import { adoptSession, currentRequestContext } from './requestContext.js';
+import {
+  checkDeviceRequest,
+  DEVICE_CODE_GRANT,
+  DevicePollThrottle,
+  isDeviceGrant,
+  withLoginPrompt,
+} from './deviceFlow.js';
+import { adoptSession, currentRequestContext, markDeviceFlow } from './requestContext.js';
 
 /** A client assertion or proof presented twice. Answered as `invalid_client`, not a 500. */
 export class ReplayDetectedError extends errors.InvalidClientAuth {
@@ -49,6 +56,9 @@ function toAdapterPayload(
   }
   adoptSession(record.sessionId, !CONTEXTUAL_MODELS.has(model));
   const payload = { ...record.payload } as AdapterPayload;
+  if (!CONTEXTUAL_MODELS.has(model) && isDeviceGrant(payload)) {
+    markDeviceFlow();
+  }
   if (record.consumedAt) {
     payload.consumed = Math.floor(Date.parse(record.consumedAt) / 1000);
   }
@@ -60,10 +70,12 @@ export class ApiPayloadAdapter implements Adapter {
   readonly #name: string;
   readonly #model: OidcPayloadModel | undefined;
   readonly #client: OidcApiClient;
+  readonly #polls: DevicePollThrottle;
 
-  constructor(name: string, client: OidcApiClient) {
+  constructor(name: string, client: OidcApiClient, polls = new DevicePollThrottle()) {
     this.#name = name;
     this.#client = client;
+    this.#polls = polls;
     const parsed = OidcPayloadModelSchema.safeParse(name);
     this.#model = parsed.success ? parsed.data : undefined;
   }
@@ -81,8 +93,21 @@ export class ApiPayloadAdapter implements Adapter {
       throw new UnsupportedModelError(this.#name, 'upsert without an expiry');
     }
     const sessionId = currentRequestContext()?.sessionId;
+    const stored = { ...payload };
+    if (model === 'DeviceCode') {
+      const params = stored.params as Record<string, unknown> | undefined;
+      checkDeviceRequest(params);
+      // The verification page reads its authorization parameters from the stored code, so
+      // this is where every approval is made to sign in again rather than ride a session
+      // the browser already had: approving a device is the step phishing aims at.
+      if (params && !stored.accountId) {
+        stored.params = { ...params, prompt: withLoginPrompt(params.prompt) };
+      }
+      // ADR D10: never carried into the device's tokens, whatever the approver earned.
+      delete stored.acr;
+    }
     const { created } = await this.#client.upsertPayload(model, id, {
-      payload: { ...payload },
+      payload: stored,
       expiresIn: Math.ceil(expiresIn),
       ...(sessionId ? { sessionId } : {}),
     });
@@ -95,6 +120,12 @@ export class ApiPayloadAdapter implements Adapter {
 
   async find(id: string): Promise<AdapterPayload | undefined> {
     const model = this.#requireModel('find');
+    const context = currentRequestContext();
+    // The grant loads the code more than once per request, and only the first is the poll.
+    if (model === 'DeviceCode' && context?.tokenRequest && !context.devicePolled) {
+      context.devicePolled = true;
+      this.#polls.check(id);
+    }
     const record = await this.#client.findPayload(model, id);
     const payload = toAdapterPayload(model, record);
     // The library loads only opaque records. A JWT access token the edge verified on this
@@ -127,7 +158,7 @@ export class ApiPayloadAdapter implements Adapter {
       return;
     }
     payload.authTime = context.authTime;
-    if (context.acr) {
+    if (context.acr && !isDeviceGrant(payload)) {
       payload.acr = context.acr;
     } else {
       delete payload.acr;
@@ -190,15 +221,19 @@ export class ApiClientAdapter implements Adapter {
         return undefined;
       }
     }
+    // ADR D10: the device grant is first-party only. The API filters it too.
+    const grants = metadata['urn:seamless:first_party']
+      ? metadata.grant_types
+      : metadata.grant_types.filter((grant) => grant !== DEVICE_CODE_GRANT);
     if (!SHARED_SECRET_METHODS.has(metadata.token_endpoint_auth_method)) {
-      return { ...metadata } as AdapterPayload;
+      return { ...metadata, grant_types: grants } as AdapterPayload;
     }
     const verified = currentRequestContext()?.verifiedClientSecret;
     const secret =
       verified?.clientId === metadata.client_id
         ? verified.value
         : randomBytes(32).toString('base64url');
-    return { ...metadata, client_secret: secret } as AdapterPayload;
+    return { ...metadata, grant_types: grants, client_secret: secret } as AdapterPayload;
   }
 
   async upsert(): Promise<void> {
@@ -230,6 +265,9 @@ export function createApiAdapterFactory(
   client: OidcApiClient,
   config: EdgeConfigCache,
 ): AdapterFactory {
+  const polls = new DevicePollThrottle();
   return (name) =>
-    name === 'Client' ? new ApiClientAdapter(client, config) : new ApiPayloadAdapter(name, client);
+    name === 'Client'
+      ? new ApiClientAdapter(client, config)
+      : new ApiPayloadAdapter(name, client, polls);
 }

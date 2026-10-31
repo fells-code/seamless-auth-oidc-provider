@@ -43,7 +43,7 @@ export function createFakeStore() {
   const revokedSessions: { sessionId: string; reason: string }[] = [];
   const events: Record<string, unknown>[] = [];
   const verified: { clientId: string; secret: string }[] = [];
-  const signed: { kind: string; clientId: string; sessionId?: string }[] = [];
+  const signed: { kind: string; clientId: string; sessionId?: string; grantType?: string }[] = [];
 
   const key = (model: string, id: string) => `${model}/${id}`;
   const live = (record: StoredRecord | undefined) =>
@@ -196,8 +196,18 @@ export function createFakeStore() {
       return json(202, { message: 'Accepted' });
     }
     if (path === '/oidc/sign' && method === 'POST') {
-      const request = body as { kind: string; clientId: string; sessionId?: string };
-      signed.push({ kind: request.kind, clientId: request.clientId, sessionId: request.sessionId });
+      const request = body as {
+        kind: string;
+        clientId: string;
+        sessionId?: string;
+        grantType?: string;
+      };
+      signed.push({
+        kind: request.kind,
+        clientId: request.clientId,
+        sessionId: request.sessionId,
+        ...(request.grantType ? { grantType: request.grantType } : {}),
+      });
       return undefined;
     }
     return undefined;

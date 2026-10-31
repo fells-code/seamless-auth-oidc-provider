@@ -204,3 +204,29 @@ button:disabled {
     transition: none !important;
   }
 }
+
+.device-code-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.device-code-field input {
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--seamless-color-border);
+  border-radius: var(--seamless-radius);
+  background: var(--seamless-color-background);
+  color: var(--seamless-color-text);
+  font: inherit;
+  font-size: 1.25rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.user-code {
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}

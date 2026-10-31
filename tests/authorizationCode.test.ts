@@ -94,7 +94,12 @@ describe('authorization code with PKCE', () => {
 
     // Every record the flow wrote and every token the API signed names the session.
     expect(started.store.signed).toEqual([
-      { kind: 'id_token', clientId: firstParty.client_id, sessionId: SESSION },
+      {
+        kind: 'id_token',
+        clientId: firstParty.client_id,
+        sessionId: SESSION,
+        grantType: 'authorization_code',
+      },
     ]);
     const bound = [...started.store.records.values()].filter((r) =>
       ['Grant', 'Session', 'AuthorizationCode', 'AccessToken'].includes(r.model),
