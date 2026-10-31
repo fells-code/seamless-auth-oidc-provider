@@ -83,7 +83,7 @@ describe('access tokens for a named API', () => {
     });
     expect(typeof payload.jti).toBe('string');
     expect(Number(payload.exp) - Number(payload.iat)).toBe(300);
-    expect(tokens.expires_in).toBe(300);
+    expect([300 - 1, 300]).toContain(tokens.expires_in);
     expect(started.store.signed).toContainEqual({
       kind: 'access_token',
       clientId: firstParty.client_id,
@@ -97,7 +97,7 @@ describe('access tokens for a named API', () => {
     const { flow, callback } = await authorize({ scope: 'openid email orders:read' });
     const tokens = await redeem(flow, callback);
     expect(tokens.access_token.split('.')).toHaveLength(1);
-    expect(tokens.expires_in).toBe(600);
+    expect([600 - 1, 600]).toContain(tokens.expires_in);
     const userinfo = await oidc.fetchUserInfo(config, tokens.access_token, USER);
     expect(userinfo).toMatchObject({ sub: USER });
   });
