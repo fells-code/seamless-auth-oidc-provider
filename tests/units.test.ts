@@ -17,6 +17,8 @@ import { ApiSigningKey } from '../src/signingKey.js';
 import { firstPartyCookie } from './browser.js';
 import { API_URL, createFakeApi, EDGE_CONFIG, json, rsaKey, SERVICE_SECRET } from './fakeApi.js';
 
+const renderPage = async () => ({ html: '', headers: {} });
+
 const SECRET = 'adapter-cookie-secret-that-is-at-least-32-chars';
 
 describe('EdgeConfigCache', () => {
@@ -107,6 +109,7 @@ describe('clientBasedCORS', () => {
   const { jwk } = rsaKey('k');
   const configuration = buildProviderConfiguration({
     client,
+    renderPage,
     config: EDGE_CONFIG,
     configCache: new EdgeConfigCache(client, EDGE_CONFIG),
     signingKeys: [new ApiSigningKey({ ...jwk, kid: 'k', alg: 'RS256' }, client, true)],
