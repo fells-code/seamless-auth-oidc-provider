@@ -104,10 +104,15 @@ export class FakeBrowser {
     return this.#send(url, { method: 'GET', headers });
   }
 
-  async post(url: string, headers: Record<string, string> = {}): Promise<EdgeResponse> {
+  async post(
+    url: string,
+    headers: Record<string, string> = {},
+    body?: string,
+  ): Promise<EdgeResponse> {
     return this.#send(url, {
       method: 'POST',
       headers: { origin: new URL(ISSUER).origin, 'sec-fetch-site': 'same-origin', ...headers },
+      ...(body === undefined ? {} : { body }),
     });
   }
 

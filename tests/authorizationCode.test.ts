@@ -7,7 +7,6 @@
 import * as oidc from 'openid-client';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { satisfiesFreshness } from '../src/interactions.js';
 import { FakeBrowser } from './browser.js';
 import { EDGE_CONFIG, ISSUER } from './fakeApi.js';
 import {
@@ -209,7 +208,7 @@ describe('authorization code with PKCE', () => {
     expect(stale.json()).toEqual({ error: 'interaction_mismatch' });
   });
 
-  it('asks for a fresh sign-in when prompt=login', async () => {
+  it('asks for a step-up when prompt=login', async () => {
     started.store.addAccount({
       sessionId: SESSION,
       claims: { sub: USER, roles: [], org_id: null },
@@ -221,7 +220,7 @@ describe('authorization code with PKCE', () => {
     signIn(browser);
     const login = await browser.post(`/interaction/${uid}/login`);
     expect(login.status).toBe(409);
-    expect(login.json()).toEqual({ error: 'reauthentication_required' });
+    expect(login.json()).toEqual({ error: 'step_up_required', methods: ['passkey'] });
   });
 
   it('lets the user abort', async () => {
@@ -283,21 +282,5 @@ describe('third-party clients', () => {
     const next = await follow(browser, again.url.href);
     const nextDetails = await browser.get(`/interaction/${interactionUid(next)}/details`);
     expect(nextDetails.json()).toMatchObject({ prompt: { name: 'consent' } });
-  });
-});
-
-describe('satisfiesFreshness', () => {
-  const interaction = (reasons: string[], params: Record<string, unknown> = {}) =>
-    ({ iat: 1000, prompt: { name: 'login', reasons, details: {} }, params }) as never;
-
-  it('needs an authentication after the request for prompt=login', () => {
-    expect(satisfiesFreshness(interaction(['login_prompt']), 999, 1100)).toBe(false);
-    expect(satisfiesFreshness(interaction(['login_prompt']), 1000, 1100)).toBe(true);
-  });
-
-  it('honours max_age', () => {
-    expect(satisfiesFreshness(interaction([], { max_age: '60' }), 1000, 1100)).toBe(false);
-    expect(satisfiesFreshness(interaction([], { max_age: 200 }), 1000, 1100)).toBe(true);
-    expect(satisfiesFreshness(interaction(['no_session']), 0, 1100)).toBe(true);
   });
 });

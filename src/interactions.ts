@@ -11,6 +11,7 @@ import type Provider from 'oidc-provider';
 import { errors, type InteractionResults } from 'oidc-provider';
 
 import type { OidcApiClient } from './apiClient.js';
+import { authRequirements, stepUpMethods, unmetRequirements } from './authRequirements.js';
 import { readFirstPartySession } from './firstPartySession.js';
 import { createSameOriginGuard } from './originGuard.js';
 import { bindSession } from './requestContext.js';
@@ -37,6 +38,7 @@ class InteractionRefusal extends Error {
   constructor(
     readonly status: number,
     readonly error: string,
+    readonly extra: Record<string, unknown> = {},
   ) {
     super(error);
     this.name = 'InteractionRefusal';
@@ -50,27 +52,6 @@ function stringParam(params: Record<string, unknown>, name: string): string | un
 
 function promptDetails(interaction: Interaction): PromptDetails {
   return interaction.prompt.details as PromptDetails;
-}
-
-/**
- * `prompt=login` and `max_age` ask for an authentication the RP can trust is fresh. A
- * first-party session from before the request does not count, so the hosted pages have to
- * sign the user in again first.
- */
-export function satisfiesFreshness(
-  interaction: Interaction,
-  authTime: number,
-  now = Math.floor(Date.now() / 1000),
-): boolean {
-  if (interaction.prompt.reasons.includes('login_prompt') && authTime < interaction.iat) {
-    return false;
-  }
-  const maxAge = interaction.params.max_age;
-  const seconds = typeof maxAge === 'string' ? Number(maxAge) : maxAge;
-  if (typeof seconds === 'number' && Number.isFinite(seconds) && now - authTime > seconds) {
-    return false;
-  }
-  return true;
 }
 
 function loginResult(accountId: string, context: OidcAuthContext): InteractionResults['login'] {
@@ -154,7 +135,10 @@ export function createInteractionRouter(options: InteractionRouterOptions): Rout
 
   router.post(
     '/interaction/:uid/login',
+    express.json({ limit: '1kb' }),
     handle(async (req, res) => {
+      const afterStepUp =
+        typeof req.body === 'object' && req.body !== null && req.body.afterStepUp === true;
       const session = firstPartySession(req);
       const interaction = await load(req, res);
       if (interaction.prompt.name !== 'login') {
@@ -180,13 +164,38 @@ export function createInteractionRouter(options: InteractionRouterOptions): Rout
           ? new InteractionRefusal(401, 'login_required')
           : context.recovery
             ? new InteractionRefusal(403, 'enrollment_required')
-            : !satisfiesFreshness(interaction, context.authTime)
-              ? new InteractionRefusal(409, 'reauthentication_required')
-              : undefined;
+            : undefined;
       if (refusal || !context) {
         // A grant left behind would bind the session to the client without a sign-in.
         await grant.destroy();
         throw refusal ?? new InteractionRefusal(401, 'login_required');
+      }
+
+      const unmet = unmetRequirements(
+        authRequirements(interaction.params),
+        context,
+        interaction.iat,
+      );
+      if (unmet) {
+        await grant.destroy();
+        if (!afterStepUp) {
+          throw new InteractionRefusal(409, 'step_up_required', {
+            methods: stepUpMethods(unmet, context),
+          });
+        }
+        // A weaker step-up than the request needs (a synced passkey for phrh, say) ends the
+        // request instead of issuing a lower acr.
+        const redirectTo = await provider.interactionResult(
+          req,
+          res,
+          {
+            error: 'unmet_authentication_requirements',
+            error_description: 'the requested authentication could not be obtained',
+          },
+          { mergeWithLastSubmission: false },
+        );
+        res.json({ redirectTo });
+        return;
       }
 
       const redirectTo = await provider.interactionResult(req, res, {
@@ -262,7 +271,7 @@ function handle(fn: (req: Request, res: Response) => Promise<void>) {
   return (req: Request, res: Response, next: NextFunction) => {
     fn(req, res).catch((error: unknown) => {
       if (error instanceof InteractionRefusal) {
-        res.status(error.status).json({ error: error.error });
+        res.status(error.status).json({ ...error.extra, error: error.error });
         return;
       }
       if (error instanceof errors.SessionNotFound) {
