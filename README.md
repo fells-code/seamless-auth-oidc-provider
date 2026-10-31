@@ -22,8 +22,8 @@ any OIDC app ──► seamless-auth-oidc-provider (public: OIDC endpoints, host
 The design is in
 [ADR 0001](https://github.com/fells-code/seamless-auth-api/blob/main/docs/adr/0001-openid-provider.md).
 
-> **Status:** under construction for Seamless Auth v0.21. The service boots, stores through the
-> API and signs through it. Sign-in, consent and the remaining grants land in the open
+> **Status:** under construction for Seamless Auth v0.21. Discovery, the authorization code
+> flow with PKCE and userinfo work. The hosted pages and the remaining grants land in the open
 > [issues](https://github.com/fells-code/seamless-auth-oidc-provider/issues).
 
 ## Requirements
@@ -57,6 +57,23 @@ docker run -p 5314:5314 --env-file .env ghcr.io/fells-code/seamless-auth-oidc-pr
 The issuer comes from the API (`oidc_issuer`), not from this service's environment. The service
 answers only requests for the issuer's own scheme and host, and refuses to start when the API
 has the provider disabled or speaks a different version of the `/oidc/*` contract.
+
+## Endpoints
+
+| Path                                | What                                               |
+| ----------------------------------- | -------------------------------------------------- |
+| `/.well-known/openid-configuration` | Discovery                                          |
+| `/authorize`, `/token`, `/userinfo` | Authorization code with PKCE, and userinfo         |
+| `/jwks`                             | The provider's public keys, read from the API      |
+| `/auth/*`                           | This service's first-party adapter, for the pages  |
+| `GET /interaction/:uid/details`     | What the current interaction needs, for the pages  |
+| `POST /interaction/:uid/login`      | Finishes login with the page's first-party session |
+| `POST /interaction/:uid/consent`    | Grants what the client asked for                   |
+| `POST /interaction/:uid/abort`      | Returns `access_denied` to the client              |
+
+The interaction routes are for the hosted pages only. A state change needs `Sec-Fetch-Site:
+same-origin` or an `Origin` equal to the issuer's, so a page on a sibling subdomain cannot
+drive them.
 
 ## Embed in an Express app
 

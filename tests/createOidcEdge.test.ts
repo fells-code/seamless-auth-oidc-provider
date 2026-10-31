@@ -12,6 +12,7 @@ import type { KoaContextWithOIDC } from 'oidc-provider';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { OidcApiClient } from '../src/apiClient.js';
+import { EdgeConfigCache } from '../src/configCache.js';
 import { createOidcEdge } from '../src/createOidcEdge.js';
 import { buildProviderConfiguration, createFindAccount } from '../src/providerConfig.js';
 import { currentRequestContext, runWithRequestContext } from '../src/requestContext.js';
@@ -208,10 +209,11 @@ describe('buildProviderConfiguration', () => {
     allowClientSecrets: false,
     thirdPartyClientsEnabled: false,
   };
+  const configCache = new EdgeConfigCache(client, config);
 
   it('needs a signing key with a supported alg', () => {
     expect(() =>
-      buildProviderConfiguration({ client, config, signingKeys: [], cookieKeys: [] }),
+      buildProviderConfiguration({ client, config, configCache, signingKeys: [], cookieKeys: [] }),
     ).toThrow(/No provider signing key/);
   });
 
@@ -219,7 +221,13 @@ describe('buildProviderConfiguration', () => {
     const { jwk } = rsaKey('weak');
     const key = new ApiSigningKey({ ...jwk, kid: 'weak', alg: 'RS1' }, client, true);
     expect(() =>
-      buildProviderConfiguration({ client, config, signingKeys: [key], cookieKeys: [] }),
+      buildProviderConfiguration({
+        client,
+        config,
+        configCache,
+        signingKeys: [key],
+        cookieKeys: [],
+      }),
     ).toThrow(/unsupported alg RS1/);
   });
 
@@ -228,6 +236,7 @@ describe('buildProviderConfiguration', () => {
     const configuration = buildProviderConfiguration({
       client,
       config,
+      configCache,
       signingKeys: [new ApiSigningKey({ ...jwk, kid: 'k', alg: 'RS256' }, client, true)],
       cookieKeys: [],
     });

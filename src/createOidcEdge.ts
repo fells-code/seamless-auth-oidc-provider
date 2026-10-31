@@ -12,6 +12,8 @@ import express, { type Router } from 'express';
 import Provider from 'oidc-provider';
 
 import { OidcApiClient } from './apiClient.js';
+import { EdgeConfigCache } from './configCache.js';
+import { createInteractionRouter } from './interactions.js';
 import { buildProviderConfiguration } from './providerConfig.js';
 import { runWithRequestContext } from './requestContext.js';
 import { signingKeysFrom } from './signingKey.js';
@@ -67,13 +69,24 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
   });
 
   const config = await checkApiCompatibility(client);
+  const configCache = new EdgeConfigCache(client, config);
   const signingKeys = signingKeysFrom(await client.jwks(), client);
 
   const provider = new Provider(
     config.issuer,
-    buildProviderConfiguration({ client, config, signingKeys, cookieKeys: options.cookieKeys }),
+    buildProviderConfiguration({
+      client,
+      config,
+      configCache,
+      signingKeys,
+      cookieKeys: options.cookieKeys,
+    }),
   );
   provider.proxy = options.trustProxy === true;
+  // The library answers a bare server_error and logs nothing, so this is the only trace.
+  provider.on('server_error', (_ctx, error: Error) => {
+    console.error(`[oidc-provider] ${error.name}: ${error.message}`);
+  });
 
   const issuerUrl = new URL(config.issuer);
   const router = express.Router();
@@ -119,6 +132,16 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
       refreshCookieName: ADAPTER_COOKIE_NAMES.refresh,
       preAuthCookieName: ADAPTER_COOKIE_NAMES.preAuth,
       ...(options.fetchAdapterManifest === false ? { fetchManifest: false } : {}),
+    }),
+  );
+
+  router.use(
+    createInteractionRouter({
+      provider,
+      client,
+      issuerOrigin: issuerUrl.origin,
+      adapterCookieSecret: options.adapterCookieSecret,
+      accessCookieName: ADAPTER_COOKIE_NAMES.access,
     }),
   );
 

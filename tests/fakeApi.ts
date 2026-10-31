@@ -37,6 +37,14 @@ export function rsaKey(kid: string): { privateKey: KeyObject; jwk: TestJwk } {
   return { privateKey, jwk: { ...exported, kty: 'RSA', kid, alg: 'RS256', use: 'sig' } };
 }
 
+export const EDGE_CONFIG = {
+  contractVersion: OIDC_EDGE_CONTRACT_VERSION,
+  issuer: ISSUER,
+  appName: 'Example',
+  allowClientSecrets: false,
+  thirdPartyClientsEnabled: false,
+};
+
 /** A stand-in for the API's /oidc/* routes that signs with a real key. */
 export function createFakeApi() {
   const requests: RecordedRequest[] = [];
@@ -46,13 +54,7 @@ export function createFakeApi() {
 
   const defaults: Handler = ({ method, path, body }) => {
     if (method === 'GET' && path === '/oidc/config') {
-      return json(200, {
-        contractVersion: OIDC_EDGE_CONTRACT_VERSION,
-        issuer: ISSUER,
-        appName: 'Example',
-        allowClientSecrets: false,
-        thirdPartyClientsEnabled: false,
-      });
+      return json(200, EDGE_CONFIG);
     }
     if (method === 'GET' && path === '/oidc/jwks') {
       return json(200, { activeKid: 'active', keys: [previous.jwk, active.jwk] });
