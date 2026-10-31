@@ -10,6 +10,7 @@ import type { OidcJwksResponse, OidcPublicJwk, OidcSignKind } from '@seamless-au
 import { ExternalSigningKey } from 'oidc-provider';
 
 import type { OidcApiClient } from './apiClient.js';
+import { DEVICE_CODE_GRANT } from './deviceFlow.js';
 import { currentRequestContext } from './requestContext.js';
 
 export class UnsignableTokenError extends Error {
@@ -126,12 +127,16 @@ export class ApiSigningKey extends ExternalSigningKey {
     }
     const sessionId = currentRequestContext()?.sessionId;
     const { kind, clientId } = classifyToken(header, decodePart(payloadPart), sessionId);
+    const context = currentRequestContext();
     const { signature } = await this.#client.sign({
       kind,
       kid: this.#kid,
       clientId,
       signingInput,
       ...(sessionId ? { sessionId } : {}),
+      ...(kind === 'client_credentials'
+        ? {}
+        : { grantType: context?.deviceFlow ? DEVICE_CODE_GRANT : 'authorization_code' }),
     });
     return Buffer.from(signature, 'base64url');
   }

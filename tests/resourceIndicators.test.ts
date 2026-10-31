@@ -88,6 +88,7 @@ describe('access tokens for a named API', () => {
       kind: 'access_token',
       clientId: firstParty.client_id,
       sessionId: SESSION,
+      grantType: 'authorization_code',
     });
     // The ID token still identifies the user to the app itself.
     expect(tokens.claims()).toMatchObject({ aud: firstParty.client_id, sub: USER });
