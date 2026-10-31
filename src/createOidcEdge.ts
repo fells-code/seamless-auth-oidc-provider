@@ -19,6 +19,7 @@ import { createHostedPagesRouter } from './hostedPages.js';
 import { createInteractionRouter } from './interactions.js';
 import { createSameOriginGuard } from './originGuard.js';
 import { buildProviderConfiguration, PROVIDER_COOKIE_NAMES } from './providerConfig.js';
+import { revokeSessionOnRefreshReuse } from './refreshReuse.js';
 import { runWithRequestContext } from './requestContext.js';
 import { hostOnlyResumeCookie } from './resumeCookie.js';
 import { signingKeysFrom } from './signingKey.js';
@@ -92,6 +93,7 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
   provider.proxy = options.trustProxy === true;
   provider.use(hostOnlyResumeCookie(PROVIDER_COOKIE_NAMES.resume, '/authorize'));
   provider.use(verifyClientSecrets(client));
+  provider.use(revokeSessionOnRefreshReuse(client));
   // The library answers a bare server_error and logs nothing, so this is the only trace.
   provider.on('server_error', (_ctx, error: Error) => {
     console.error(`[oidc-provider] ${error.name}: ${error.message}`);

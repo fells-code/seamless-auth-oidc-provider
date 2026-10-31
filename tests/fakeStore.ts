@@ -40,6 +40,7 @@ export function createFakeStore() {
   const accounts = new Map<string, FakeAccount>();
   const secrets = new Map<string, string>();
   const resources = new Map<string, OidcClientResource[]>();
+  const revokedSessions: { sessionId: string; reason: string }[] = [];
   const verified: { clientId: string; secret: string }[] = [];
   const signed: { kind: string; clientId: string; sessionId?: string }[] = [];
 
@@ -181,6 +182,14 @@ export function createFakeStore() {
       };
       return json(200, context);
     }
+    match = /^\/oidc\/sessions\/([^/]+)\/revoke$/.exec(path);
+    if (match && method === 'POST') {
+      revokedSessions.push({
+        sessionId: decodeURIComponent(match[1]!),
+        reason: (body as { reason: string }).reason,
+      });
+      return json(204);
+    }
     if (path === '/oidc/sign' && method === 'POST') {
       const request = body as { kind: string; clientId: string; sessionId?: string };
       signed.push({ kind: request.kind, clientId: request.clientId, sessionId: request.sessionId });
@@ -193,6 +202,7 @@ export function createFakeStore() {
     handle,
     records,
     signed,
+    revokedSessions,
     addClient(metadata: OidcClientMetadata) {
       clients.set(metadata.client_id, metadata);
     },

@@ -95,7 +95,39 @@ export class ApiPayloadAdapter implements Adapter {
 
   async find(id: string): Promise<AdapterPayload | undefined> {
     const model = this.#requireModel('find');
-    return toAdapterPayload(model, await this.#client.findPayload(model, id));
+    const record = await this.#client.findPayload(model, id);
+    const payload = toAdapterPayload(model, record);
+    if (model === 'RefreshToken' && payload && record?.sessionId) {
+      await this.#adoptCurrentAuthContext(payload, record.sessionId);
+    }
+    return payload;
+  }
+
+  /**
+   * A refresh carries the acr, amr and auth_time of the session's current row, not the ones
+   * the token was first issued with: a step-up since then moved them, and `/oidc/sign`
+   * refuses any value that differs from the row.
+   */
+  async #adoptCurrentAuthContext(payload: AdapterPayload, sessionId: string): Promise<void> {
+    const { clientId, accountId } = payload;
+    if (typeof clientId !== 'string') {
+      return;
+    }
+    const context = await this.#client.authContext(sessionId, clientId);
+    if (!context || !context.active || context.recovery || context.userId !== accountId) {
+      return;
+    }
+    payload.authTime = context.authTime;
+    if (context.acr) {
+      payload.acr = context.acr;
+    } else {
+      delete payload.acr;
+    }
+    if (context.amr.length > 0) {
+      payload.amr = [...context.amr];
+    } else {
+      delete payload.amr;
+    }
   }
 
   async findByUserCode(userCode: string): Promise<AdapterPayload | undefined> {

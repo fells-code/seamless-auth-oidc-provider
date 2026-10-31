@@ -95,6 +95,7 @@ src/
   clientSecrets.ts   checks shared client secrets with the API, swaps in a one-time stand-in
   authRequirements.ts  acr_values, max_age and prompt=login against the API's auth context
   resourceServers.ts resource indicators (RFC 8707) and JWT access tokens from the API's links
+  refreshReuse.ts    ends the first-party session when a rotated refresh token is reused
 ui/                  the hosted pages: Vite + React on @seamless-auth/react, built to dist/ui
 tests/               vitest, against a fake API in tests/fakeApi.ts
 ```
