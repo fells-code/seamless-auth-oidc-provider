@@ -4,11 +4,23 @@
  * See LICENSE file in the project root for full license information
  */
 
-import type { OidcEdgeConfigResponse } from '@seamless-auth/types';
-import type { Configuration, FindAccount, KoaContextWithOIDC } from 'oidc-provider';
+import type { OidcAuthContext, OidcEdgeConfigResponse } from '@seamless-auth/types';
+import {
+  type Configuration,
+  type FindAccount,
+  interactionPolicy,
+  type KoaContextWithOIDC,
+} from 'oidc-provider';
 
 import { createApiAdapterFactory } from './adapter.js';
 import type { OidcApiClient } from './apiClient.js';
+import {
+  ACR_VALUES,
+  authRequirements,
+  hasRequirements,
+  meetsAcr,
+  unmetRequirements,
+} from './authRequirements.js';
 import type { EdgeConfigCache } from './configCache.js';
 import { FIRST_PARTY_CLIENT_PROPERTY } from './interactions.js';
 import { currentRequestContext } from './requestContext.js';
@@ -101,6 +113,70 @@ export async function loadExistingGrant(ctx: KoaContextWithOIDC) {
   return grant;
 }
 
+type ProviderSession = NonNullable<KoaContextWithOIDC['oidc']['session']>;
+
+function adoptAuthContext(session: ProviderSession, context: OidcAuthContext): void {
+  session.acr = context.acr ?? undefined;
+  session.amr = context.amr.length > 0 ? [...context.amr] : undefined;
+  session.loginTs = context.authTime;
+}
+
+/**
+ * Replaces the library's max_age and essential acr checks, which read the provider session's
+ * copy of the login and want an exact acr match. The API's auth context is the record: it
+ * moves with every step-up, and /oidc/sign refuses any acr, amr or auth_time that differs.
+ */
+export function authContextCheck(client: OidcApiClient) {
+  return new interactionPolicy.Check(
+    'auth_context',
+    'the requested authentication could not be obtained',
+    async (ctx) => {
+      const { oidc } = ctx;
+      const accountId = oidc.session?.accountId;
+      if (!oidc.session || !accountId || !oidc.client) {
+        return interactionPolicy.Check.NO_NEED_TO_PROMPT;
+      }
+      const requirements = authRequirements(oidc.params ?? {});
+      const login = oidc.result?.login;
+      if (login) {
+        // The interaction copied these from the API after checking freshness itself.
+        return requirements.acr && !meetsAcr(login.acr, requirements.acr)
+          ? interactionPolicy.Check.REQUEST_PROMPT
+          : interactionPolicy.Check.NO_NEED_TO_PROMPT;
+      }
+      const sessionId = currentRequestContext()?.sessionId;
+      const context = sessionId
+        ? await client.authContext(sessionId, oidc.client.clientId)
+        : undefined;
+      if (context) {
+        if (!context.active || context.recovery || context.userId !== accountId) {
+          return interactionPolicy.Check.REQUEST_PROMPT;
+        }
+        adoptAuthContext(oidc.session, context);
+      }
+      if (!hasRequirements(requirements)) {
+        return interactionPolicy.Check.NO_NEED_TO_PROMPT;
+      }
+      return !context || unmetRequirements(requirements, context)
+        ? interactionPolicy.Check.REQUEST_PROMPT
+        : interactionPolicy.Check.NO_NEED_TO_PROMPT;
+    },
+  );
+}
+
+export function buildInteractionPolicy(client: OidcApiClient) {
+  const policy = interactionPolicy.base();
+  const login = policy.get('login');
+  if (!login) {
+    throw new Error('The base interaction policy has no login prompt');
+  }
+  for (const reason of ['max_age', 'essential_acrs', 'essential_acr']) {
+    login.checks.remove(reason);
+  }
+  login.checks.add(authContextCheck(client));
+  return policy;
+}
+
 /**
  * The locked configuration from ADR 0001 (D1, D6). The API's admin routes refuse client
  * settings that would loosen it, so this is the ceiling, not a default.
@@ -142,7 +218,7 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
       idTokenSigningAlgValues: signingAlgs,
       userinfoSigningAlgValues: signingAlgs,
     },
-    acrValues: ['phr', 'phrh'],
+    acrValues: [...ACR_VALUES],
     scopes: ['openid', 'offline_access', 'email', 'phone', 'seamless'],
     // Listing claims replaces the library's defaults. The session claims sit under openid so
     // every ID token carries the assurance the API recorded (ADR D9, D11), asked for or not.
@@ -177,7 +253,10 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
       long: { httpOnly: true, sameSite: 'lax', secure: true, path: '/' },
       short: { httpOnly: true, sameSite: 'lax', secure: true, path: '/' },
     },
-    interactions: { url: (_ctx, interaction) => `/interaction/${interaction.uid}` },
+    interactions: {
+      policy: buildInteractionPolicy(input.client),
+      url: (_ctx, interaction) => `/interaction/${interaction.uid}`,
+    },
     clientBasedCORS: (ctx, origin, client) => {
       if (origin === 'null') {
         return false;

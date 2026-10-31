@@ -18,8 +18,10 @@ import {
   pendingInteraction,
   rememberInteraction,
   sameOriginUrl,
+  type StepUpMethod,
 } from './interactionApi';
 import { Notice } from './Notice';
+import { StepUp } from './StepUp';
 
 const EXPIRED = 'This sign-in request has expired. Go back to the app and start again.';
 
@@ -34,6 +36,7 @@ export function InteractionPage({ appName }: { appName: string }) {
   const [details, setDetails] = useState<InteractionDetails | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [stepUp, setStepUp] = useState<StepUpMethod[] | null>(null);
   const started = useRef(false);
 
   useEffect(() => {
@@ -58,9 +61,10 @@ export function InteractionPage({ appName }: { appName: string }) {
   }, [uid]);
 
   const complete = useCallback(
-    async (step: InteractionStep) => {
+    async (step: InteractionStep, afterStepUp = false) => {
       setBusy(true);
-      const result = await finish(uid, step);
+      setStepUp(null);
+      const result = await finish(uid, step, afterStepUp);
       if (result.ok) {
         const target = sameOriginUrl(result.data.redirectTo);
         if (target) {
@@ -78,15 +82,8 @@ export function InteractionPage({ appName }: { appName: string }) {
         case 'login_required':
           navigate('/login', { replace: true });
           return;
-        case 'reauthentication_required':
-          // Signing out first would end the session this interaction belongs to, so the user
-          // signs in again on top of it.
-          rememberInteraction({
-            uid,
-            clientName: details?.client.name ?? '',
-            reauthenticate: true,
-          });
-          navigate('/login', { replace: true });
+        case 'step_up_required':
+          setStepUp(result.methods?.length ? result.methods : ['passkey']);
           return;
         case 'enrollment_required':
           navigate('/register-passkey', { replace: true });
@@ -105,7 +102,7 @@ export function InteractionPage({ appName }: { appName: string }) {
           setMessage('Something went wrong. Go back to the app and try again.');
       }
     },
-    [uid, navigate, details],
+    [uid, navigate],
   );
 
   useEffect(() => {
@@ -125,6 +122,16 @@ export function InteractionPage({ appName }: { appName: string }) {
 
   if (message) {
     return <Notice title="We could not finish signing you in">{message}</Notice>;
+  }
+  if (stepUp && details) {
+    return (
+      <StepUp
+        clientName={details.client.name}
+        methods={stepUp}
+        onVerified={() => void complete('login', true)}
+        onCancel={() => void complete('abort')}
+      />
+    );
   }
   if (details?.prompt.name === 'consent' && !details.client.firstParty) {
     return (

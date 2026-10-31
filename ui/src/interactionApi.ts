@@ -24,24 +24,45 @@ export interface InteractionDetails {
 
 export type InteractionStep = 'login' | 'consent' | 'abort';
 
-export type ApiResult<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
+export type StepUpMethod = 'passkey' | 'totp';
 
-async function call<T>(path: string, method: 'GET' | 'POST'): Promise<ApiResult<T>> {
+export type ApiResult<T> =
+  { ok: true; data: T } | { ok: false; status: number; error: string; methods?: StepUpMethod[] };
+
+function stepUpMethods(body: object): StepUpMethod[] | undefined {
+  if (!('methods' in body) || !Array.isArray(body.methods)) {
+    return undefined;
+  }
+  return body.methods.filter(
+    (method): method is StepUpMethod => method === 'passkey' || method === 'totp',
+  );
+}
+
+async function call<T>(
+  path: string,
+  method: 'GET' | 'POST',
+  payload?: unknown,
+): Promise<ApiResult<T>> {
   try {
     const response = await fetch(path, {
       method,
       credentials: 'same-origin',
-      headers: { accept: 'application/json' },
+      headers: {
+        accept: 'application/json',
+        ...(payload === undefined ? {} : { 'content-type': 'application/json' }),
+      },
+      ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
     });
     const body: unknown = await response.json().catch(() => undefined);
     if (response.ok) {
       return { ok: true, data: body as T };
     }
-    const error =
-      typeof body === 'object' && body !== null && 'error' in body && typeof body.error === 'string'
-        ? body.error
-        : 'server_error';
-    return { ok: false, status: response.status, error };
+    if (typeof body === 'object' && body !== null && 'error' in body) {
+      const error = typeof body.error === 'string' ? body.error : 'server_error';
+      const methods = stepUpMethods(body);
+      return { ok: false, status: response.status, error, ...(methods ? { methods } : {}) };
+    }
+    return { ok: false, status: response.status, error: 'server_error' };
   } catch {
     return { ok: false, status: 0, error: 'network_error' };
   }
@@ -53,8 +74,12 @@ export function getDetails(uid: string) {
   return call<InteractionDetails>(`${base(uid)}/details`, 'GET');
 }
 
-export function finish(uid: string, step: InteractionStep) {
-  return call<{ redirectTo: string }>(`${base(uid)}/${step}`, 'POST');
+export function finish(uid: string, step: InteractionStep, afterStepUp = false) {
+  return call<{ redirectTo: string }>(
+    `${base(uid)}/${step}`,
+    'POST',
+    afterStepUp ? { afterStepUp: true } : undefined,
+  );
 }
 
 /** Only ever follow a redirect back into this service. The provider takes it from there. */
@@ -72,8 +97,6 @@ const PENDING_KEY = 'seamless.interaction';
 export interface PendingInteraction {
   uid: string;
   clientName: string;
-  /** Set when the app asked for a fresh sign-in (`prompt=login` or `max_age`). */
-  reauthenticate?: boolean;
 }
 
 /**
@@ -99,13 +122,7 @@ export function pendingInteraction(): PendingInteraction | null {
       'clientName' in parsed &&
       typeof parsed.clientName === 'string'
     ) {
-      return {
-        uid: parsed.uid,
-        clientName: parsed.clientName,
-        ...('reauthenticate' in parsed && parsed.reauthenticate === true
-          ? { reauthenticate: true }
-          : {}),
-      };
+      return { uid: parsed.uid, clientName: parsed.clientName };
     }
   } catch {
     // Treated as nothing pending.

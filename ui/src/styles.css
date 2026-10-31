@@ -174,6 +174,30 @@ button:disabled {
   text-align: center;
 }
 
+.error {
+  color: var(--seamless-color-text);
+  border-left: 4px solid var(--seamless-color-primary);
+  padding-left: 0.75rem;
+}
+
+.step-up-totp {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+.step-up-totp input {
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--seamless-color-border);
+  border-radius: var(--seamless-radius);
+  background: var(--seamless-color-surface);
+  color: var(--seamless-color-text);
+  font: inherit;
+  letter-spacing: 0.2em;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;

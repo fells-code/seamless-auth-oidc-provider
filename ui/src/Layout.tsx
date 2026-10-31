@@ -28,11 +28,6 @@ export function Layout({
             Signing in to continue to <strong>{pending.clientName}</strong>
           </p>
         ) : null}
-        {pending?.reauthenticate ? (
-          <p className="brand-context" role="status">
-            {pending.clientName} asked you to sign in again before it continues.
-          </p>
-        ) : null}
       </header>
       <main className="content" id="main">
         {children}

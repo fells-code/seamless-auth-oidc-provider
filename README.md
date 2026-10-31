@@ -60,20 +60,38 @@ has the provider disabled or speaks a different version of the `/oidc/*` contrac
 
 ## Endpoints
 
-| Path                                | What                                               |
-| ----------------------------------- | -------------------------------------------------- |
-| `/.well-known/openid-configuration` | Discovery                                          |
-| `/authorize`, `/token`, `/userinfo` | Authorization code with PKCE, and userinfo         |
-| `/jwks`                             | The provider's public keys, read from the API      |
-| `/auth/*`                           | This service's first-party adapter, for the pages  |
-| `GET /interaction/:uid/details`     | What the current interaction needs, for the pages  |
-| `POST /interaction/:uid/login`      | Finishes login with the page's first-party session |
-| `POST /interaction/:uid/consent`    | Grants what the client asked for                   |
-| `POST /interaction/:uid/abort`      | Returns `access_denied` to the client              |
+| Path                                | What                                              |
+| ----------------------------------- | ------------------------------------------------- |
+| `/.well-known/openid-configuration` | Discovery                                         |
+| `/authorize`, `/token`, `/userinfo` | Authorization code with PKCE, and userinfo        |
+| `/jwks`                             | The provider's public keys, read from the API     |
+| `/auth/*`                           | This service's first-party adapter, for the pages |
+| `GET /interaction/:uid/details`     | What the current interaction needs, for the pages |
+| `POST /interaction/:uid/login`      | Finishes login, or answers `step_up_required`     |
+| `POST /interaction/:uid/consent`    | Grants what the client asked for                  |
+| `POST /interaction/:uid/abort`      | Returns `access_denied` to the client             |
 
 The interaction routes are for the hosted pages only. A state change needs `Sec-Fetch-Site:
 same-origin` or an `Origin` equal to the issuer's, so a page on a sibling subdomain cannot
 drive them.
+
+## Step-up (`acr_values`, `max_age`, `prompt=login`)
+
+Discovery lists `acr_values_supported: ["phr", "phrh"]`. `phrh` (a device-bound passkey with
+user verification) satisfies a request for `phr`. On every authorization from an existing
+session this service reads the session's auth context from the API and decides from what the
+API reports, never from its own copy:
+
+- `acr_values` is met when the session's acr ranks at least the weakest value asked for.
+- `max_age` is met when the API's `auth_time` is within it, or the user authenticated during
+  this request. `prompt=login` needs the latter.
+
+When either falls short, the hosted pages ask the user to confirm it is them on the same
+session: a passkey, or an authenticator app code when only freshness is missing on a session
+with no acr (an app code never earns an acr). The pages then read the context again and copy
+`acr`, `amr` and `auth_time` into the tokens unchanged. If the step-up still falls short, for
+example a synced passkey when `phrh` was asked for, the app gets
+`unmet_authentication_requirements` rather than a token with a lower acr.
 
 ## Client authentication
 
