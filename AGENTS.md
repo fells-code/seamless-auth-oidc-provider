@@ -96,6 +96,9 @@ src/
   authRequirements.ts  acr_values, max_age and prompt=login against the API's auth context
   resourceServers.ts resource indicators (RFC 8707) and JWT access tokens from the API's links
   refreshReuse.ts    ends the first-party session when a rotated refresh token is reused
+  jwtAccessTokens.ts stores JWT access tokens by jti so introspection and revocation see them
+  tokenAudit.ts      records revocations in the API's audit log
+  rateLimit.ts       per-IP limit on introspection and revocation
 ui/                  the hosted pages: Vite + React on @seamless-auth/react, built to dist/ui
 tests/               vitest, against a fake API in tests/fakeApi.ts
 ```

@@ -126,6 +126,26 @@ identifier can reject every token minted for another.
   built-in `<issuer>/seamless` resource with `notices:send`, which the API lists for it, for
   `POST /applications/account-notices` on the API.
 
+## Introspection and revocation
+
+`/token/introspection` (RFC 7662) and `/token/revocation` (RFC 7009) are listed in discovery
+and take the same client authentication as `/token`.
+
+- **Introspection.** A client may introspect its own tokens. A resource server registers as a
+  confidential application linked to its resource, and may then introspect tokens whose `aud`
+  is that resource. Any other caller gets `{ "active": false }`. Every answer is read from the
+  API's store, so a token whose first-party session has ended is inactive at once.
+- **JWT access tokens.** The library keeps no record of a JWT, so this service stores one
+  under its `jti` when it is issued and maps a presented JWT back to it, after checking the
+  signature against the provider's own keys. The `jti` alone is never accepted as a token.
+  A resource server that verifies JWTs locally still accepts one until it expires; one that
+  introspects sees revocation immediately.
+- **Revocation.** A client revokes its own refresh or access token. Revoking a refresh token
+  ends the grant and every token under it, not the user's first-party session, so the user's
+  other apps stay signed in. Each revocation is recorded in the API's audit log
+  (`token_revoked`).
+- **Rate limit.** 1200 requests a minute per client IP across both endpoints, per instance.
+
 ## Client authentication
 
 | Client                                    | Authentication                                |

@@ -16,6 +16,8 @@ export interface EdgeRequestContext {
   sessionBound?: boolean;
   /** The one-time stand-in for a client secret the API verified on this request. */
   verifiedClientSecret?: { clientId: string; value: string };
+  /** The `jti` of a JWT access token this request presented and the edge verified. */
+  verifiedJwtTokenId?: string;
 }
 
 const storage = new AsyncLocalStorage<EdgeRequestContext>();

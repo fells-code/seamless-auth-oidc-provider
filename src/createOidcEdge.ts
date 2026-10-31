@@ -17,13 +17,16 @@ import { verifyClientSecrets } from './clientSecrets.js';
 import { EdgeConfigCache } from './configCache.js';
 import { createHostedPagesRouter } from './hostedPages.js';
 import { createInteractionRouter } from './interactions.js';
+import { acceptJwtAccessTokens, createJwtAccessTokenLookup } from './jwtAccessTokens.js';
 import { createSameOriginGuard } from './originGuard.js';
 import { buildProviderConfiguration, PROVIDER_COOKIE_NAMES } from './providerConfig.js';
+import { createRateLimiter } from './rateLimit.js';
 import { revokeSessionOnRefreshReuse } from './refreshReuse.js';
 import { runWithRequestContext } from './requestContext.js';
 import { hostOnlyResumeCookie } from './resumeCookie.js';
 import { signingKeysFrom } from './signingKey.js';
 import { checkApiCompatibility } from './startup.js';
+import { auditRevocations } from './tokenAudit.js';
 
 export const ADAPTER_COOKIE_NAMES = {
   access: '__Host-seamless-access',
@@ -94,6 +97,13 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
   provider.use(hostOnlyResumeCookie(PROVIDER_COOKIE_NAMES.resume, '/authorize'));
   provider.use(verifyClientSecrets(client));
   provider.use(revokeSessionOnRefreshReuse(client));
+  provider.use(auditRevocations(client));
+  provider.use(
+    acceptJwtAccessTokens(createJwtAccessTokenLookup(signingKeys, config.issuer), [
+      '/token/introspection',
+      '/token/revocation',
+    ]),
+  );
   // The library answers a bare server_error and logs nothing, so this is the only trace.
   provider.on('server_error', (_ctx, error: Error) => {
     console.error(`[oidc-provider] ${error.name}: ${error.message}`);
@@ -164,6 +174,13 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
       uiDir: options.uiDir ?? fileURLToPath(new URL('./ui/', import.meta.url)),
       configCache,
     }),
+  );
+
+  const tokenStatusLimiter = createRateLimiter({ limit: 1200, windowMs: 60_000 });
+  const issuerBase = issuerUrl.pathname.replace(/\/$/, '');
+  router.use(
+    [`${issuerBase}/token/introspection`, `${issuerBase}/token/revocation`],
+    tokenStatusLimiter,
   );
 
   router.use(issuerUrl.pathname, provider.callback());

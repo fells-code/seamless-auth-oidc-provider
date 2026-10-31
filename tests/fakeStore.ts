@@ -41,6 +41,7 @@ export function createFakeStore() {
   const secrets = new Map<string, string>();
   const resources = new Map<string, OidcClientResource[]>();
   const revokedSessions: { sessionId: string; reason: string }[] = [];
+  const events: Record<string, unknown>[] = [];
   const verified: { clientId: string; secret: string }[] = [];
   const signed: { kind: string; clientId: string; sessionId?: string }[] = [];
 
@@ -190,6 +191,10 @@ export function createFakeStore() {
       });
       return json(204);
     }
+    if (path === '/oidc/events' && method === 'POST') {
+      events.push(body as Record<string, unknown>);
+      return json(202, { message: 'Accepted' });
+    }
     if (path === '/oidc/sign' && method === 'POST') {
       const request = body as { kind: string; clientId: string; sessionId?: string };
       signed.push({ kind: request.kind, clientId: request.clientId, sessionId: request.sessionId });
@@ -203,6 +208,13 @@ export function createFakeStore() {
     records,
     signed,
     revokedSessions,
+    events,
+    /** What the API does when a first-party session ends: its provider records go with it. */
+    endSession(sessionId: string) {
+      for (const [id, record] of records) {
+        if (record.sessionId === sessionId) records.delete(id);
+      }
+    },
     addClient(metadata: OidcClientMetadata) {
       clients.set(metadata.client_id, metadata);
     },

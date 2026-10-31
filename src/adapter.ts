@@ -97,6 +97,15 @@ export class ApiPayloadAdapter implements Adapter {
     const model = this.#requireModel('find');
     const record = await this.#client.findPayload(model, id);
     const payload = toAdapterPayload(model, record);
+    // The library loads only opaque records. A JWT access token the edge verified on this
+    // request is read like one, so introspection and revocation can see it.
+    if (
+      payload?.format === 'jwt' &&
+      (model === 'AccessToken' || model === 'ClientCredentials') &&
+      currentRequestContext()?.verifiedJwtTokenId === id
+    ) {
+      delete payload.format;
+    }
     if (model === 'RefreshToken' && payload && record?.sessionId) {
       await this.#adoptCurrentAuthContext(payload, record.sessionId);
     }

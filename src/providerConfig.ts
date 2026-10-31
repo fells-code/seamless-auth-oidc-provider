@@ -23,6 +23,7 @@ import {
 } from './authRequirements.js';
 import type { EdgeConfigCache } from './configCache.js';
 import { FIRST_PARTY_CLIENT_PROPERTY } from './interactions.js';
+import { storeJwtAccessToken } from './jwtAccessTokens.js';
 import { currentRequestContext } from './requestContext.js';
 import { createResourceIndicators, DEFAULT_ACCESS_TOKEN_TTL } from './resourceServers.js';
 import type { ApiSigningKey } from './signingKey.js';
@@ -191,6 +192,28 @@ export function buildInteractionPolicy(client: OidcApiClient) {
 }
 
 /**
+ * A client may introspect its own tokens. A resource server is a confidential client linked
+ * to its resource, so it may introspect tokens whose audience is that resource and nothing
+ * else: no client sees the tokens of apps it has no part in.
+ */
+export function createIntrospectionPolicy(client: OidcApiClient) {
+  return async (
+    _ctx: KoaContextWithOIDC,
+    caller: { clientId: string; clientAuthMethod?: string | undefined },
+    token: { clientId?: string; aud?: string | string[] },
+  ): Promise<boolean> => {
+    if (token.clientId === caller.clientId) {
+      return true;
+    }
+    if (caller.clientAuthMethod === 'none' || typeof token.aud !== 'string') {
+      return false;
+    }
+    const resources = await client.clientResources(caller.clientId);
+    return resources.some((resource) => resource.identifier === token.aud);
+  };
+}
+
+/**
  * The locked configuration from ADR 0001 (D1, D6). The API's admin routes refuse client
  * settings that would loosen it, so this is the ceiling, not a default.
  */
@@ -247,10 +270,13 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
     routes: {
       authorization: '/authorize',
       token: '/token',
+      introspection: '/token/introspection',
+      revocation: '/token/revocation',
       userinfo: '/userinfo',
       jwks: '/jwks',
       end_session: '/session/end',
     },
+    formats: { customizers: { jwt: storeJwtAccessToken } },
     ttl: {
       // A number here would override the resource's own lifetime.
       AccessToken: (_ctx, token) =>
@@ -298,9 +324,8 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
       clientCredentials: { enabled: true },
       // TODO(#5): RP-initiated logout through the hosted UI.
       rpInitiatedLogout: { enabled: false },
-      // TODO(#6): introspection and revocation.
-      introspection: { enabled: false },
-      revocation: { enabled: false },
+      introspection: { enabled: true, allowedPolicy: createIntrospectionPolicy(input.client) },
+      revocation: { enabled: true },
       // TODO(#7): device flow, first-party clients only.
       deviceFlow: { enabled: false },
     },
