@@ -132,12 +132,13 @@ export class ApiPayloadAdapter implements Adapter {
   async find(id: string): Promise<AdapterPayload | undefined> {
     const model = this.#requireModel('find');
     const context = currentRequestContext();
+    const record = await this.#client.findPayload(model, id);
     // The grant loads the code more than once per request, and only the first is the poll.
-    if (model === 'DeviceCode' && context?.tokenRequest && !context.devicePolled) {
+    // Only a code that exists is tracked, so made-up ones cannot fill the throttle.
+    if (model === 'DeviceCode' && record && context?.tokenRequest && !context.devicePolled) {
       context.devicePolled = true;
       this.#polls.check(id);
     }
-    const record = await this.#client.findPayload(model, id);
     const payload = toAdapterPayload(model, record);
     if (context && model in SINGLE_USE && typeof payload?.grantId === 'string') {
       context.singleUseGrants ??= new Map();

@@ -121,7 +121,7 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
 
   const issuerUrl = new URL(config.issuer);
   const issuerBase = issuerUrl.pathname.replace(/\/$/, '');
-  provider.use(deviceFlowMiddleware(`${issuerBase}/token`));
+  provider.use(deviceFlowMiddleware());
   const router = express.Router();
 
   // The library builds endpoint URLs from the request's scheme and host, so a request for
