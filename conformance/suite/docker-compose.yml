@@ -1,0 +1,37 @@
+# The OpenID Foundation conformance suite, from its published images. Based on the
+# suite's docker-compose-prebuilt.yml. The provider under test runs on the host as
+# https://op.seamless.test:5321, which host-gateway maps for the suite's back-channel calls.
+name: seamless-oidc-conformance
+
+services:
+  mongodb:
+    image: mongo:6.0.13
+    tmpfs:
+      - /data/db
+
+  server:
+    image: registry.gitlab.com/openid/conformance-suite:${SUITE_VERSION:-release-v5.3.4}
+    environment:
+      BASE_URL: https://localhost.emobix.co.uk:8443
+      BASE_MTLS_URL: https://localhost.emobix.co.uk:8444
+      MONGODB_HOST: mongodb
+      SPRING_PROFILES_ACTIVE: dev
+      OIDC_GOOGLE_CLIENTID: unused
+      OIDC_GOOGLE_SECRET: unused
+      OIDC_GITLAB_CLIENTID: unused
+      OIDC_GITLAB_SECRET: unused
+    extra_hosts:
+      - 'op.seamless.test:host-gateway'
+    depends_on:
+      - mongodb
+
+  nginx:
+    image: registry.gitlab.com/openid/conformance-suite/nginx:${SUITE_VERSION:-release-v5.3.4}
+    ports:
+      - '127.0.0.1:8443:8443'
+    networks:
+      default:
+        aliases:
+          - localhost.emobix.co.uk
+    depends_on:
+      - server
