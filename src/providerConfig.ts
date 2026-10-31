@@ -27,6 +27,7 @@ import type { HostedPageRenderer } from './hostedPages.js';
 import { FIRST_PARTY_CLIENT_PROPERTY } from './interactions.js';
 import { storeJwtAccessToken } from './jwtAccessTokens.js';
 import { createLogoutPages } from './logout.js';
+import { PKCE_REQUIRED_PROPERTY, pkceRequired } from './pkce.js';
 import { currentRequestContext } from './requestContext.js';
 import { createResourceIndicators } from './resourceServers.js';
 import type { ApiSigningKey } from './signingKey.js';
@@ -256,7 +257,7 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
     loadExistingGrant,
     jwks: { keys: input.signingKeys },
     responseTypes: ['code'],
-    pkce: { required: () => true },
+    pkce: { required: pkceRequired },
     // Many RPs read the profile from the ID token rather than calling userinfo.
     conformIdTokenClaims: false,
     rotateRefreshToken: true,
@@ -288,7 +289,11 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
       seamless: ['roles', 'org_id'],
     },
     extraClientMetadata: {
-      properties: ['urn:seamless:first_party', ...Object.values(CLIENT_TTL_PROPERTIES)],
+      properties: [
+        'urn:seamless:first_party',
+        PKCE_REQUIRED_PROPERTY,
+        ...Object.values(CLIENT_TTL_PROPERTIES),
+      ],
     },
     routes: {
       authorization: '/authorize',
