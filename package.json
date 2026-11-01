@@ -1,6 +1,6 @@
 {
   "name": "@seamless-auth/oidc-provider",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "OpenID Provider service for Seamless Auth, backed by the private Seamless Auth API.",
   "author": "Fells Code, LLC",
   "license": "Apache-2.0",
