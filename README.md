@@ -16,7 +16,7 @@ any OIDC app ──► seamless-auth-oidc-provider (public: OIDC endpoints, host
 - Built on [`oidc-provider`](https://github.com/panva/node-oidc-provider) 9.x.
 - Holds no private keys and no database. The API signs every token after checking its claims,
   and stores all provider state.
-- Code flow with PKCE only, refresh rotation always on, `private_key_jwt` for confidential
+- Code flow with PKCE (a confidential client can be opted out, and then sends `nonce` unless that is waived too), refresh rotation always on, `private_key_jwt` for confidential
   clients, and shared secrets only for clients opted in on the API.
 
 The design is in
@@ -199,7 +199,9 @@ off unless an admin enables the device flow on a first-party application (ADR D1
 ## Security defaults
 
 The configuration is locked to OAuth 2.1 and RFC 9700: the code flow with `S256` PKCE for
-every client, exact redirect matching (with RFC 8252 loopback ports for native apps), refresh
+every client (unless an admin opts a confidential client out, RFC 9700 section 2.1.1, in
+which case it must send `nonce` whenever it asks for an ID token, unless an admin waives
+that as well), exact redirect matching (with RFC 8252 loopback ports for native apps), refresh
 rotation, `iss` on authorization responses and audience-restricted access tokens. The full
 matrix, with the test behind each row, is in [docs/oauth-security.md](docs/oauth-security.md).
 
