@@ -102,6 +102,9 @@ MESSAGING_EMAIL_FROM=noreply@seamless.test
 AWS_ENDPOINT_URL_SES=http://127.0.0.1:4590
 AWS_ACCESS_KEY_ID=conformance
 AWS_SECRET_ACCESS_KEY=conformance
+# The API posts back-channel logout tokens to the suite, whose certificate is self-signed.
+# Test stack only: this API never reaches anything but the suite and the fake SES.
+NODE_TLS_REJECT_UNAUTHORIZED=0
 EOF
 
 cat > edge.env <<EOF

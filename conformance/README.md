@@ -35,6 +35,14 @@ the job fails if `conformance-pkce` is not refused, and the outcome for the othe
 picks the expectations marked `"when": "pkce-opt-out"` or `"when": "pkce-required"` (an API
 without the opt-out, where every client requires PKCE).
 
+The back-channel plan has its own clients, `conformance-backchannel-1/2`, whose
+`backchannelLogoutUri` points at the suite. Only they have one, because the API posts a logout
+token whenever a session ends and a module of another plan fails on a call it does not expect.
+The suite's certificate is self-signed, so the stack's API runs with
+`NODE_TLS_REJECT_UNAUTHORIZED=0`; that setting lives only in `stack/start.sh`. On the hosted
+logout page the runner presses "Sign out", which ends the first-party session and sends the
+tokens.
+
 A module fails the job when it ends `FAILED`, is interrupted or times out and is not listed
 in `expected.json`, or when a listed expectation no longer happens. `WARNING`, `REVIEW` and
 `SKIPPED` results pass, and the ones we know about are listed with their reason so the

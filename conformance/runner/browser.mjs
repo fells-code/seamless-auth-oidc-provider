@@ -100,6 +100,16 @@ export async function signIn(session, url, account, screenshotPath) {
         else await register(page, account);
         continue;
       }
+      if (path === '/session/end') {
+        // "Sign out" ends the first-party session too, which is what sends the logout tokens.
+        const signOut = page.getByRole('button', { name: /^sign out$/i });
+        if (await signOut.isEnabled({ timeout: 500 }).catch(() => false)) {
+          await evidence(page, screenshotPath);
+          await signOut.click({ timeout: 2000 }).catch(() => {});
+          await page.waitForTimeout(500);
+          continue;
+        }
+      }
       if (path.startsWith('/interaction/')) {
         // Both buttons disable themselves while the request is in flight.
         const stepUp = page.getByRole('button', { name: /use your passkey/i });
