@@ -34,9 +34,11 @@ const endpoints = (alias) => ({
 const clients = [];
 const configs = {};
 
-function secretClient(id, alias, method = 'client_secret_basic') {
+// The OIDCC plans send neither code_challenge nor, in one module, nonce, so the suite's
+// clients use the per-application opt-out. conformance-pkce keeps both requirements.
+function secretClient(id, alias, method = 'client_secret_basic', optOut = true) {
   const secret = randomBytes(24).toString('base64url');
-  clients.push({ id, method, secret, ...endpoints(alias) });
+  clients.push({ id, method, secret, optOut, ...endpoints(alias) });
   return { client_id: id, client_secret: secret };
 }
 
@@ -45,6 +47,7 @@ function keyClient(id, alias) {
   clients.push({
     id,
     method: 'private_key_jwt',
+    optOut: true,
     jwks: { keys: [key.public] },
     ...endpoints(alias),
   });
@@ -65,6 +68,8 @@ configs['basic'] = {
     'client_secret_post',
   ),
 };
+
+secretClient('conformance-pkce', 'seamless-basic', 'client_secret_basic', false);
 
 configs['pkjwt'] = {
   alias: 'seamless-pkjwt',
@@ -90,6 +95,14 @@ const statements = clients.map(
 VALUES (${sql(c.id)}, ${sql(c.id)}, true, 'confidential', ${sql(c.method)}, ${c.jwks ? json(c.jwks) : 'NULL'}, ${sql(c.secret ? secretLookup(c.secret) : null)}, ${json(c.redirectUris)}, ${json(c.postLogoutRedirectUris)}, ${json(['authorization_code', 'refresh_token'])}, now(), now())
 ON CONFLICT (id) DO UPDATE SET jwks = EXCLUDED.jwks, "secretLookup" = EXCLUDED."secretLookup", "redirectUris" = EXCLUDED."redirectUris", "postLogoutRedirectUris" = EXCLUDED."postLogoutRedirectUris", "tokenEndpointAuthMethod" = EXCLUDED."tokenEndpointAuthMethod";`,
 );
+
+// An API without the opt-out has no such columns, and then every client requires PKCE.
+const optedOut = clients.filter((c) => c.optOut).map((c) => sql(c.id));
+statements.push(`DO $$ BEGIN
+IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'oidc_clients' AND column_name = 'pkceRequired') THEN
+  UPDATE oidc_clients SET "pkceRequired" = false, "nonceRequired" = false WHERE id IN (${optedOut.join(', ')});
+END IF;
+END $$;`);
 
 execFileSync(
   'docker',

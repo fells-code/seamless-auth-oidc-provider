@@ -57,6 +57,37 @@ const browser = await chromium.launch({
 // copied into each module's fresh authenticator, as a returning user's device would hold it.
 const account = { email: `conformance+${Date.now()}@seamless.test`, credential: null };
 
+// Whether /authorize accepts a request with neither code_challenge nor nonce from a client.
+async function acceptsPlainRequest(clientId) {
+  const issuer = process.env.ISSUER ?? 'https://op.seamless.test:5321';
+  const url = `${issuer}/authorize?${new URLSearchParams({
+    client_id: clientId,
+    response_type: 'code',
+    scope: 'openid',
+    redirect_uri: 'https://localhost.emobix.co.uk:8443/test/a/seamless-basic/callback',
+    state: 'probe',
+  })}`;
+  const context = await browser.newContext({ ignoreHTTPSErrors: true });
+  const page = await context.newPage();
+  let refused = false;
+  page.on('request', (request) => {
+    if (/[?&]error=/.test(request.url())) refused = true;
+  });
+  await page.goto(url).catch(() => {});
+  await context.close();
+  return !refused;
+}
+
+// The OIDCC clients opt out of PKCE and nonce when the API stores the opt-out; the
+// expectations that only hold without it are marked "when": "pkce-required".
+const pkceMode = (await acceptsPlainRequest('conformance-basic-1'))
+  ? 'pkce-opt-out'
+  : 'pkce-required';
+const pkceStillRequired = !(await acceptsPlainRequest('conformance-pkce'));
+log(
+  `client PKCE mode: ${pkceMode}; conformance-pkce refuses a plain request: ${pkceStillRequired}`,
+);
+
 async function newBrowserSession() {
   const context = await browser.newContext({ ignoreHTTPSErrors: true });
   const page = await context.newPage();
@@ -162,11 +193,13 @@ async function runModule(planId, entry, label) {
 }
 
 function expectationFor(planId, testModule) {
-  return expected.find((e) => e.plan === planId && e.module === testModule);
+  return expected.find(
+    (e) => e.plan === planId && e.module === testModule && (!e.when || e.when === pkceMode),
+  );
 }
 
 const rows = [];
-let unexpected = 0;
+let unexpected = pkceStillRequired ? 0 : 1;
 for (const plan of plans) {
   const config = JSON.parse(readFileSync(`${runDir}/configs/${plan.config}.json`, 'utf8'));
   const created = await api(
@@ -215,6 +248,7 @@ await browser.close();
 
 for (const e of expected) {
   if (
+    (!e.when || e.when === pkceMode) &&
     !onlyModules &&
     (!only || only.has(e.plan)) &&
     plans.some((p) => p.id === e.plan) &&
@@ -238,7 +272,9 @@ const counts = rows.reduce(
 const summary = [
   '## OpenID conformance',
   '',
-  `Suite ${process.env.SUITE_VERSION ?? 'release-v5.3.4'}. ${Object.entries(counts)
+  `Suite ${process.env.SUITE_VERSION ?? 'release-v5.3.4'}, ${pkceMode}.${
+    pkceStillRequired ? '' : ' **conformance-pkce accepted a request without PKCE.**'
+  } ${Object.entries(counts)
     .map(([k, v]) => `${k} ${v}`)
     .join(', ')}. ${unexpected ? `**${unexpected} unexpected**` : 'No unexpected results.'}`,
   '',

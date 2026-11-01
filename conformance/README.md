@@ -17,10 +17,23 @@ that touch the service and nightly.
 | Front channel               | [`runner/`](runner): Playwright with a virtual authenticator, because the hosted pages sign in with a passkey     |
 | Expected results            | [`expected.json`](expected.json): every result that is not a pass, with the reason                                |
 
+CI builds the API at the ref in [`api-ref`](api-ref) (`main`, or a commit while the API is
+ahead of this service). The edge refuses to start when the API's `/oidc` contract version is
+not its own, so a pull request that moves `@seamless-auth/types` to a new contract version
+sets `api-ref` to an API commit that speaks it, or back to `main`. The `api-ref` input of a
+manual run overrides it.
+
 The runner registers one account by email code and passkey on the first sign-in, then
 copies that passkey into each module's fresh browser, as the suite expects a new browser per
 module. When a module asks for a screenshot (the provider's own error page, or the second
 login for `prompt=login` and `max_age`), the runner uploads the page it acted on.
+
+The OIDCC plans send no `code_challenge`, and one module sends no `nonce`, so the suite's
+clients are seeded with the per-application PKCE and nonce opt-out. `conformance-pkce` keeps
+both requirements. Before the plans, the runner sends each a plain authorization request:
+the job fails if `conformance-pkce` is not refused, and the outcome for the other clients
+picks the expectations marked `"when": "pkce-opt-out"` or `"when": "pkce-required"` (an API
+without the opt-out, where every client requires PKCE).
 
 A module fails the job when it ends `FAILED`, is interrupted or times out and is not listed
 in `expected.json`, or when a listed expectation no longer happens. `WARNING`, `REVIEW` and
