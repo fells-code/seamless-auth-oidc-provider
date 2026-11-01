@@ -70,6 +70,7 @@ has the provider disabled or speaks a different version of the `/oidc/*` contrac
 | `POST /interaction/:uid/login`      | Finishes login, or answers `step_up_required`     |
 | `POST /interaction/:uid/consent`    | Grants what the client asked for                  |
 | `POST /interaction/:uid/abort`      | Returns `access_denied` to the client             |
+| `/session/end`                      | RP-initiated logout, confirmed on a hosted page   |
 
 The interaction routes are for the hosted pages only. A state change needs `Sec-Fetch-Site:
 same-origin` or an `Origin` equal to the issuer's, so a page on a sibling subdomain cannot
@@ -145,6 +146,23 @@ and take the same client authentication as `/token`.
   other apps stay signed in. Each revocation is recorded in the API's audit log
   (`token_revoked`).
 - **Rate limit.** 1200 requests a minute per client IP across both endpoints, per instance.
+
+## Logout
+
+`/session/end` (OpenID RP-Initiated Logout 1.0) takes `id_token_hint` or `client_id`, and a
+`post_logout_redirect_uri` registered for the client. The hosted page asks before anything
+ends:
+
+- **Sign out** ends the provider session and the first-party session it was made under
+  (through the API's `/oidc/sessions/:id/revoke`, reason `provider_logout`), and clears the
+  adapter cookies. Every other app the user signed in to with it is signed out too.
+- **Only sign out of** the asking app ends that app's grant and keeps the session.
+
+Back-channel logout (OpenID Back-Channel Logout 1.0) is sent by the API, not by this service.
+The API holds the keys and sees every way a session ends (this logout, admin revoke, sign-out
+everywhere, eviction), so a client with a `backchannelLogoutUri` gets a `logout+jwt` token
+whichever one it was. Discovery lists `backchannel_logout_supported` and
+`backchannel_logout_session_supported`, and ID tokens for such a client carry `sid`.
 
 ## Security defaults
 

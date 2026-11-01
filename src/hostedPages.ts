@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { HostedUi } from '@seamless-auth/types';
-import express, { type Response, type Router } from 'express';
+import express, { type Router } from 'express';
 
 import type { EdgeConfigCache } from './configCache.js';
 
@@ -79,8 +79,15 @@ function escapeHtml(value: string): string {
  * ADR D7's CSP. The bundled screens inject their CSS at runtime, so injected `<style>`
  * elements take the response's nonce (see `ui/src/nonce.ts`). Scripts stay `'self'` only.
  */
-export function contentSecurityPolicy(nonce: string, logoUrl?: string): string {
+export function contentSecurityPolicy(
+  nonce: string,
+  logoUrl?: string,
+  formActions: readonly string[] = [],
+): string {
   const logoOrigin = logoUrl ? ` ${new URL(logoUrl).origin}` : '';
+  // Browsers apply form-action to the redirects that follow a submission, so a form that
+  // ends at an app's post-logout URI has to name that origin.
+  const formOrigins = formActions.map((uri) => ` ${new URL(uri).origin}`).join('');
   return [
     "default-src 'none'",
     "script-src 'self'",
@@ -89,7 +96,7 @@ export function contentSecurityPolicy(nonce: string, logoUrl?: string): string {
     "font-src 'self'",
     "connect-src 'self'",
     "manifest-src 'self'",
-    "form-action 'self'",
+    `form-action 'self'${formOrigins}`,
     "frame-ancestors 'none'",
     "base-uri 'none'",
   ].join('; ');
@@ -132,16 +139,23 @@ export function brandingFor(appName: string, hostedUi: HostedUi | undefined): Ho
   };
 }
 
+/** A page the provider renders itself (logout, device flow), handed to the SPA as data. */
+export type HostedPageData = Record<string, unknown> & { view: string };
+
 export function renderIndex(
   template: string,
   branding: HostedBranding,
   nonce: string,
   style?: BrandingStyle,
+  page?: HostedPageData,
 ): string {
   const head = [
     `<meta name="seamless-csp-nonce" content="${nonce}" />`,
     `<title>Sign in to ${escapeHtml(branding.appName)}</title>`,
     `<script type="application/json" id="seamless-hosted">${inlineJson(branding)}</script>`,
+    ...(page
+      ? [`<script type="application/json" id="seamless-page">${inlineJson(page)}</script>`]
+      : []),
     ...(style
       ? [
           `<style nonce="${nonce}"${style.palette ? ' id="seamless-palette"' : ''}>${style.css}</style>`,
@@ -151,27 +165,51 @@ export function renderIndex(
   return template.replace(HEAD_PLACEHOLDER, head);
 }
 
-function setPageHeaders(res: Response, nonce: string, logoUrl?: string) {
-  res.set({
-    'content-security-policy': contentSecurityPolicy(nonce, logoUrl),
+function pageHeaders(nonce: string, logoUrl?: string, formActions?: readonly string[]) {
+  return {
+    'content-security-policy': contentSecurityPolicy(nonce, logoUrl, formActions),
     'cache-control': 'no-store',
     'cross-origin-opener-policy': 'same-origin',
     'referrer-policy': 'no-referrer',
     'x-content-type-options': 'nosniff',
     'x-frame-options': 'DENY',
-  });
+  };
+}
+
+export interface RenderedPage {
+  html: string;
+  headers: Record<string, string>;
+}
+
+export type HostedPageRenderer = (
+  page?: HostedPageData,
+  formActions?: readonly string[],
+) => Promise<RenderedPage>;
+
+export function createHostedPageRenderer(options: HostedPagesOptions): HostedPageRenderer {
+  const template = readFileSync(join(options.uiDir, 'index.html'), 'utf8');
+  if (!template.includes(HEAD_PLACEHOLDER)) {
+    throw new Error(`${options.uiDir}/index.html has no ${HEAD_PLACEHOLDER} placeholder`);
+  }
+  return async (page, formActions) => {
+    const config = await options.configCache.get();
+    const nonce = randomBytes(16).toString('base64');
+    const branding = brandingFor(config.appName, config.hostedUi);
+    return {
+      html: renderIndex(template, branding, nonce, brandingStyle(config.hostedUi), page),
+      headers: pageHeaders(nonce, branding.logoUrl, formActions),
+    };
+  };
 }
 
 /**
  * Serves the hosted login and consent pages. Branding is read from the API's config on each
  * page load and written into `index.html`, so changing it is a config write, never a build.
  */
-export function createHostedPagesRouter(options: HostedPagesOptions): Router {
-  const template = readFileSync(join(options.uiDir, 'index.html'), 'utf8');
-  if (!template.includes(HEAD_PLACEHOLDER)) {
-    throw new Error(`${options.uiDir}/index.html has no ${HEAD_PLACEHOLDER} placeholder`);
-  }
-
+export function createHostedPagesRouter(
+  options: HostedPagesOptions,
+  render: HostedPageRenderer = createHostedPageRenderer(options),
+): Router {
   const router = express.Router();
 
   router.use(
@@ -188,15 +226,9 @@ export function createHostedPagesRouter(options: HostedPagesOptions): Router {
   );
 
   router.get([...HOSTED_PAGE_PATHS], (_req, res, next) => {
-    options.configCache
-      .get()
-      .then((config) => {
-        const nonce = randomBytes(16).toString('base64');
-        const branding = brandingFor(config.appName, config.hostedUi);
-        setPageHeaders(res, nonce, branding.logoUrl);
-        res
-          .type('html')
-          .send(renderIndex(template, branding, nonce, brandingStyle(config.hostedUi)));
+    render()
+      .then(({ html, headers }) => {
+        res.set(headers).type('html').send(html);
       })
       .catch(next);
   });
