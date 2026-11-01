@@ -31,14 +31,27 @@ const endpoints = (alias) => ({
   postLogoutRedirectUris: [`${suiteBase}/test/a/${alias}/post_logout_redirect`],
 });
 
+// Only the back-channel plan's clients get a logout URI: the API posts to it whenever a
+// session ends, and a module of another plan answers an unexpected call by failing.
+const withBackchannel = (alias) => ({
+  ...endpoints(alias),
+  backchannelLogoutUri: `${suiteBase}/test/a/${alias}/backchannel_logout`,
+});
+
 const clients = [];
 const configs = {};
 
 // The OIDCC plans send neither code_challenge nor, in one module, nonce, so the suite's
 // clients use the per-application opt-out. conformance-pkce keeps both requirements.
-function secretClient(id, alias, method = 'client_secret_basic', optOut = true) {
+function secretClient(
+  id,
+  alias,
+  method = 'client_secret_basic',
+  optOut = true,
+  uris = endpoints(alias),
+) {
   const secret = randomBytes(24).toString('base64url');
-  clients.push({ id, method, secret, optOut, ...endpoints(alias) });
+  clients.push({ id, method, secret, optOut, ...uris });
   return { client_id: id, client_secret: secret };
 }
 
@@ -71,6 +84,24 @@ configs['basic'] = {
 
 secretClient('conformance-pkce', 'seamless-basic', 'client_secret_basic', false);
 
+const backchannelAlias = 'seamless-backchannel';
+const backchannelClient = (id) =>
+  secretClient(
+    id,
+    backchannelAlias,
+    'client_secret_basic',
+    true,
+    withBackchannel(backchannelAlias),
+  );
+
+configs['backchannel'] = {
+  alias: backchannelAlias,
+  description: 'Seamless OpenID Provider, back-channel logout',
+  server,
+  client: backchannelClient('conformance-backchannel-1'),
+  client2: backchannelClient('conformance-backchannel-2'),
+};
+
 configs['pkjwt'] = {
   alias: 'seamless-pkjwt',
   description: 'Seamless OpenID Provider, private_key_jwt',
@@ -91,9 +122,9 @@ const json = (value) => sql(JSON.stringify(value));
 const statements = clients.map(
   (
     c,
-  ) => `INSERT INTO oidc_clients (id, name, "firstParty", "clientType", "tokenEndpointAuthMethod", jwks, "secretLookup", "redirectUris", "postLogoutRedirectUris", "grantTypes", "createdAt", "updatedAt")
-VALUES (${sql(c.id)}, ${sql(c.id)}, true, 'confidential', ${sql(c.method)}, ${c.jwks ? json(c.jwks) : 'NULL'}, ${sql(c.secret ? secretLookup(c.secret) : null)}, ${json(c.redirectUris)}, ${json(c.postLogoutRedirectUris)}, ${json(['authorization_code', 'refresh_token'])}, now(), now())
-ON CONFLICT (id) DO UPDATE SET jwks = EXCLUDED.jwks, "secretLookup" = EXCLUDED."secretLookup", "redirectUris" = EXCLUDED."redirectUris", "postLogoutRedirectUris" = EXCLUDED."postLogoutRedirectUris", "tokenEndpointAuthMethod" = EXCLUDED."tokenEndpointAuthMethod";`,
+  ) => `INSERT INTO oidc_clients (id, name, "firstParty", "clientType", "tokenEndpointAuthMethod", jwks, "secretLookup", "redirectUris", "postLogoutRedirectUris", "backchannelLogoutUri", "grantTypes", "createdAt", "updatedAt")
+VALUES (${sql(c.id)}, ${sql(c.id)}, true, 'confidential', ${sql(c.method)}, ${c.jwks ? json(c.jwks) : 'NULL'}, ${sql(c.secret ? secretLookup(c.secret) : null)}, ${json(c.redirectUris)}, ${json(c.postLogoutRedirectUris)}, ${sql(c.backchannelLogoutUri)}, ${json(['authorization_code', 'refresh_token'])}, now(), now())
+ON CONFLICT (id) DO UPDATE SET jwks = EXCLUDED.jwks, "secretLookup" = EXCLUDED."secretLookup", "redirectUris" = EXCLUDED."redirectUris", "postLogoutRedirectUris" = EXCLUDED."postLogoutRedirectUris", "backchannelLogoutUri" = EXCLUDED."backchannelLogoutUri", "tokenEndpointAuthMethod" = EXCLUDED."tokenEndpointAuthMethod";`,
 );
 
 // An API without the opt-out has no such columns, and then every client requires PKCE.

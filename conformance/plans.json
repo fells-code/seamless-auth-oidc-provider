@@ -45,9 +45,7 @@
       "response_type": "code"
     },
     "config": "basic",
-    "profile": "RP-Initiated OP",
-    "enabled": false,
-    "note": "Enable with RP-initiated logout (oidc-provider#5)."
+    "profile": "RP-Initiated OP"
   },
   {
     "id": "backchannel-logout",
@@ -56,9 +54,7 @@
       "client_registration": "static_client",
       "response_type": "code"
     },
-    "config": "basic",
-    "profile": "Back-Channel OP",
-    "enabled": false,
-    "note": "Enable with back-channel logout (oidc-provider#5). Needs backchannelLogoutUri on the seeded clients."
+    "config": "backchannel",
+    "profile": "Back-Channel OP"
   }
 ]
