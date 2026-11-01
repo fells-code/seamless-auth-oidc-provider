@@ -15,6 +15,7 @@ import { authRequirements, stepUpMethods, unmetRequirements } from './authRequir
 import { readFirstPartySession } from './firstPartySession.js';
 import { createSameOriginGuard } from './originGuard.js';
 import { bindSession } from './requestContext.js';
+import { grantLifetime } from './tokenLifetimes.js';
 
 export const FIRST_PARTY_CLIENT_PROPERTY = 'urn:seamless:first_party';
 
@@ -159,6 +160,8 @@ export function createInteractionRouter(options: InteractionRouterOptions): Rout
       // The API answers the auth context only for a session holding a grant for the client,
       // so the grant is saved first. It starts empty: the consent step fills it.
       const grant = new provider.Grant({ accountId: session.userId, clientId: found.clientId });
+      // Saved outside a provider request, where the ttl.Grant function cannot see the client.
+      Object.assign(grant, { expiresIn: grantLifetime(found) });
       const grantId = await grant.save();
 
       const context = await client.authContext(session.sessionId, found.clientId);
@@ -241,6 +244,7 @@ export function createInteractionRouter(options: InteractionRouterOptions): Rout
       for (const [indicator, scopes] of Object.entries(details.missingResourceScopes ?? {})) {
         grant.addResourceScope(indicator, scopes.join(' '));
       }
+      Object.assign(grant, { expiresIn: grantLifetime(found) });
       const grantId = await grant.save();
 
       const redirectTo = await provider.interactionResult(
