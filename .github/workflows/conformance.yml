@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       api-ref:
-        description: 'seamless-auth-api ref to test against (default: main)'
+        description: 'seamless-auth-api ref to test against (default: conformance/api-ref)'
         required: false
         default: ''
       plans:
@@ -47,11 +47,17 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Pick the API ref
+        id: api-ref
+        env:
+          INPUT_REF: ${{ inputs.api-ref }}
+        run: echo "ref=${INPUT_REF:-$(cat conformance/api-ref)}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout the API
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: fells-code/seamless-auth-api
-          ref: ${{ inputs.api-ref }}
+          ref: ${{ steps.api-ref.outputs.ref }}
           path: api
 
       - name: Pull the conformance suite
