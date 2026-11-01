@@ -9,9 +9,10 @@ import { createPublicKey, verify } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
 import { OidcApiClient } from '../src/apiClient.js';
+import { OidcSignRefusedError } from '../src/errors.js';
 import { runWithRequestContext } from '../src/requestContext.js';
 import { classifyToken, signingKeysFrom, UnsignableTokenError } from '../src/signingKey.js';
-import { API_URL, createFakeApi, SERVICE_SECRET } from './fakeApi.js';
+import { API_URL, createFakeApi, json, SERVICE_SECRET } from './fakeApi.js';
 
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
 
@@ -101,6 +102,21 @@ describe('ApiSigningKey.sign', () => {
     });
     const publicKey = createPublicKey({ key: api.active.jwk, format: 'jwk' });
     expect(verify('sha256', Buffer.from(input), publicKey, Buffer.from(signature))).toBe(true);
+  });
+
+  it('answers invalid_grant when the session ended mid-request, and passes other refusals on', async () => {
+    const { api, client } = setup();
+    const [active] = signingKeysFrom(await client.jwks(), client);
+    const input = Buffer.from(`${b64({ alg: 'RS256' })}.${b64({ aud: 'app', sub: 'u1' })}`);
+    const signWith = (error: string) => {
+      api.on(({ path }) => (path === '/oidc/sign' ? json(403, { error }) : undefined));
+      return runWithRequestContext({ correlationId: 'c', sessionId: 's1' }, () =>
+        active!.sign(input),
+      );
+    };
+
+    await expect(signWith('session_revoked')).rejects.toMatchObject({ error: 'invalid_grant' });
+    await expect(signWith('auth_context_mismatch')).rejects.toBeInstanceOf(OidcSignRefusedError);
   });
 
   it('refuses to sign with a key that is not active', async () => {

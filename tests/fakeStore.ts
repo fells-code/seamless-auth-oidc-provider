@@ -96,10 +96,11 @@ export function createFakeStore() {
     match = /^\/oidc\/payloads\/(\w+)\/([^/]+)\/consume$/.exec(path);
     if (match && method === 'POST') {
       const record = records.get(key(match[1]!, decodeURIComponent(match[2]!)));
-      if (record) {
-        record.consumedAt ??= new Date().toISOString();
+      const consumed = Boolean(record && !record.consumedAt);
+      if (record && consumed) {
+        record.consumedAt = new Date().toISOString();
       }
-      return json(204);
+      return json(200, { consumed });
     }
     match = /^\/oidc\/payloads\/(\w+)\/([^/]+)$/.exec(path);
     if (match) {
