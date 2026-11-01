@@ -22,8 +22,11 @@ import {
   unmetRequirements,
 } from './authRequirements.js';
 import type { EdgeConfigCache } from './configCache.js';
+import { createDevicePages, DEVICE_CODE_TTL_SECONDS } from './deviceFlow.js';
+import type { HostedPageRenderer } from './hostedPages.js';
 import { FIRST_PARTY_CLIENT_PROPERTY } from './interactions.js';
 import { storeJwtAccessToken } from './jwtAccessTokens.js';
+import { createLogoutPages } from './logout.js';
 import { currentRequestContext } from './requestContext.js';
 import { createResourceIndicators, DEFAULT_ACCESS_TOKEN_TTL } from './resourceServers.js';
 import type { ApiSigningKey } from './signingKey.js';
@@ -49,10 +52,17 @@ export interface ProviderConfigurationInput {
   signingKeys: ApiSigningKey[];
   cookieKeys: string[];
   configCache: EdgeConfigCache;
+  renderPage: HostedPageRenderer;
 }
 
-// The routes where the library loads the browser session's account before the grant.
-const AUTHORIZATION_ROUTES = new Set(['authorization', 'resume']);
+// The routes where the library loads the browser session's account before the grant. The
+// device flow's verification page runs the same authorization checks in the browser.
+const AUTHORIZATION_ROUTES = new Set([
+  'authorization',
+  'resume',
+  'code_verification',
+  'device_resume',
+]);
 
 export function createFindAccount(client: OidcApiClient): FindAccount {
   return async (ctx, sub) => {
@@ -152,6 +162,10 @@ export function authContextCheck(client: OidcApiClient) {
       }
       const requirements = authRequirements(oidc.params ?? {});
       const login = oidc.result?.login;
+      // A device approval always signs in again (see the DeviceCode upsert in adapter.ts).
+      if (oidc.route === 'code_verification' && !login) {
+        return interactionPolicy.Check.REQUEST_PROMPT;
+      }
       if (login) {
         // The interaction copied these from the API after checking freshness itself.
         return requirements.acr && !meetsAcr(login.acr, requirements.acr)
@@ -275,6 +289,8 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
       userinfo: '/userinfo',
       jwks: '/jwks',
       end_session: '/session/end',
+      code_verification: '/device',
+      device_authorization: '/device/auth',
     },
     formats: { customizers: { jwt: storeJwtAccessToken } },
     ttl: {
@@ -282,6 +298,7 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
       AccessToken: (_ctx, token) =>
         token.resourceServer?.accessTokenTTL ?? DEFAULT_ACCESS_TOKEN_TTL,
       AuthorizationCode: 60,
+      DeviceCode: DEVICE_CODE_TTL_SECONDS,
       IdToken: 600,
       Interaction: 600,
       // The API hides every record whose first-party session has ended, so these are
@@ -311,7 +328,8 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
     features: {
       devInteractions: { enabled: false },
       registration: { enabled: false },
-      backchannelLogout: { enabled: false },
+      // The API sends the logout tokens (see leaveBackchannelLogoutToApi).
+      backchannelLogout: { enabled: true },
       externalSigningSupport: { enabled: true, ack: 'experimental-01' },
       resourceIndicators: {
         enabled: true,
@@ -322,12 +340,11 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
         getResourceServerInfo: resourceIndicators.getResourceServerInfo,
       },
       clientCredentials: { enabled: true },
-      // TODO(#5): RP-initiated logout through the hosted UI.
-      rpInitiatedLogout: { enabled: false },
+      rpInitiatedLogout: { enabled: true, ...createLogoutPages(input.renderPage) },
       introspection: { enabled: true, allowedPolicy: createIntrospectionPolicy(input.client) },
       revocation: { enabled: true },
-      // TODO(#7): device flow, first-party clients only.
-      deviceFlow: { enabled: false },
+      // First-party clients only: the API lists the grant for no other (ADR D10).
+      deviceFlow: { enabled: true, ...createDevicePages(input.renderPage, input.client) },
     },
   };
 }

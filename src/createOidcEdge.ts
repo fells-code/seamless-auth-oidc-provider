@@ -15,9 +15,11 @@ import Provider from 'oidc-provider';
 import { OidcApiClient } from './apiClient.js';
 import { verifyClientSecrets } from './clientSecrets.js';
 import { EdgeConfigCache } from './configCache.js';
-import { createHostedPagesRouter } from './hostedPages.js';
+import { deviceFlowMiddleware } from './deviceFlow.js';
+import { createHostedPageRenderer, createHostedPagesRouter } from './hostedPages.js';
 import { createInteractionRouter } from './interactions.js';
 import { acceptJwtAccessTokens, createJwtAccessTokenLookup } from './jwtAccessTokens.js';
+import { endFirstPartySessionOnLogout, leaveBackchannelLogoutToApi } from './logout.js';
 import { createSameOriginGuard } from './originGuard.js';
 import { buildProviderConfiguration, PROVIDER_COOKIE_NAMES } from './providerConfig.js';
 import { createRateLimiter } from './rateLimit.js';
@@ -82,6 +84,11 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
   const config = await checkApiCompatibility(client);
   const configCache = new EdgeConfigCache(client, config);
   const signingKeys = signingKeysFrom(await client.jwks(), client);
+  const hostedPages = {
+    uiDir: options.uiDir ?? fileURLToPath(new URL('./ui/', import.meta.url)),
+    configCache,
+  };
+  const renderPage = createHostedPageRenderer(hostedPages);
 
   const provider = new Provider(
     config.issuer,
@@ -91,13 +98,16 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
       configCache,
       signingKeys,
       cookieKeys: options.cookieKeys,
+      renderPage,
     }),
   );
+  leaveBackchannelLogoutToApi(provider);
   provider.proxy = options.trustProxy === true;
   provider.use(hostOnlyResumeCookie(PROVIDER_COOKIE_NAMES.resume, '/authorize'));
   provider.use(verifyClientSecrets(client));
   provider.use(revokeSessionOnRefreshReuse(client));
   provider.use(auditRevocations(client));
+  provider.use(endFirstPartySessionOnLogout(client, Object.values(ADAPTER_COOKIE_NAMES)));
   provider.use(
     acceptJwtAccessTokens(createJwtAccessTokenLookup(signingKeys, config.issuer), [
       '/token/introspection',
@@ -110,6 +120,8 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
   });
 
   const issuerUrl = new URL(config.issuer);
+  const issuerBase = issuerUrl.pathname.replace(/\/$/, '');
+  provider.use(deviceFlowMiddleware());
   const router = express.Router();
 
   // The library builds endpoint URLs from the request's scheme and host, so a request for
@@ -169,19 +181,21 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
     }),
   );
 
-  router.use(
-    createHostedPagesRouter({
-      uiDir: options.uiDir ?? fileURLToPath(new URL('./ui/', import.meta.url)),
-      configCache,
-    }),
-  );
+  router.use(createHostedPagesRouter(hostedPages, renderPage));
 
   const tokenStatusLimiter = createRateLimiter({ limit: 1200, windowMs: 60_000 });
-  const issuerBase = issuerUrl.pathname.replace(/\/$/, '');
   router.use(
     [`${issuerBase}/token/introspection`, `${issuerBase}/token/revocation`],
     tokenStatusLimiter,
   );
+
+  // User code entry (RFC 8628 section 5.1). Per IP for a guesser at one address, and across
+  // all of them for one spread over many, per instance.
+  const userCodeLimiters = [
+    createRateLimiter({ limit: 10, windowMs: 60_000 }),
+    createRateLimiter({ limit: 600, windowMs: 60_000, key: () => 'all' }),
+  ];
+  router.post(`${issuerBase}/device`, ...userCodeLimiters);
 
   router.use(issuerUrl.pathname, provider.callback());
 

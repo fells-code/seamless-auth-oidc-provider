@@ -7,6 +7,7 @@
 import { request as httpRequest } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
+import { OIDC_EDGE_CONTRACT_VERSION } from '@seamless-auth/types';
 import express from 'express';
 import type { KoaContextWithOIDC } from 'oidc-provider';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -26,6 +27,8 @@ import {
   SERVICE_SECRET,
   UI_FIXTURE_DIR,
 } from './fakeApi.js';
+
+const renderPage = async () => ({ html: '', headers: {} });
 
 const options = {
   apiUrl: API_URL,
@@ -133,7 +136,7 @@ describe('createOidcEdge', () => {
     expect(discovery.token_endpoint_auth_methods_supported).not.toContain('client_secret_jwt');
     expect(discovery.token_endpoint_auth_signing_alg_values_supported).not.toContain('HS256');
     expect(discovery).not.toHaveProperty('registration_endpoint');
-    expect(discovery).not.toHaveProperty('device_authorization_endpoint');
+    expect(discovery.device_authorization_endpoint).toBe(`${ISSUER}/device/auth`);
   });
 
   it('publishes the API keys, active first, with no private members', async () => {
@@ -183,7 +186,7 @@ describe('createOidcEdge', () => {
     api.on(({ path }) =>
       path === '/oidc/config'
         ? json(200, {
-            contractVersion: 1,
+            contractVersion: OIDC_EDGE_CONTRACT_VERSION,
             issuer: `${ISSUER}/oidc`,
             appName: 'x',
             allowClientSecrets: false,
@@ -212,7 +215,7 @@ describe('createOidcEdge', () => {
 describe('buildProviderConfiguration', () => {
   const client = new OidcApiClient({ apiUrl: API_URL, serviceSecret: SERVICE_SECRET });
   const config = {
-    contractVersion: 1,
+    contractVersion: OIDC_EDGE_CONTRACT_VERSION,
     issuer: ISSUER,
     appName: 'x',
     allowClientSecrets: false,
@@ -222,7 +225,14 @@ describe('buildProviderConfiguration', () => {
 
   it('needs a signing key with a supported alg', () => {
     expect(() =>
-      buildProviderConfiguration({ client, config, configCache, signingKeys: [], cookieKeys: [] }),
+      buildProviderConfiguration({
+        client,
+        renderPage,
+        config,
+        configCache,
+        signingKeys: [],
+        cookieKeys: [],
+      }),
     ).toThrow(/No provider signing key/);
   });
 
@@ -232,6 +242,7 @@ describe('buildProviderConfiguration', () => {
     expect(() =>
       buildProviderConfiguration({
         client,
+        renderPage,
         config,
         configCache,
         signingKeys: [key],
@@ -244,6 +255,7 @@ describe('buildProviderConfiguration', () => {
     const { jwk } = rsaKey('k');
     const configuration = buildProviderConfiguration({
       client,
+      renderPage,
       config,
       configCache,
       signingKeys: [new ApiSigningKey({ ...jwk, kid: 'k', alg: 'RS256' }, client, true)],

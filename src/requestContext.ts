@@ -18,6 +18,11 @@ export interface EdgeRequestContext {
   verifiedClientSecret?: { clientId: string; value: string };
   /** The `jti` of a JWT access token this request presented and the edge verified. */
   verifiedJwtTokenId?: string;
+  /** Set once the request loads a record from a device approval (ADR D10). */
+  deviceFlow?: boolean;
+  /** A POST to the token endpoint, where loading a device code is a poll. */
+  tokenRequest?: boolean;
+  devicePolled?: boolean;
 }
 
 const storage = new AsyncLocalStorage<EdgeRequestContext>();
@@ -38,6 +43,13 @@ export function bindSession(sessionId: string): void {
   }
   context.sessionId = sessionId;
   context.sessionBound = true;
+}
+
+export function markDeviceFlow(): void {
+  const context = storage.getStore();
+  if (context) {
+    context.deviceFlow = true;
+  }
 }
 
 /**
