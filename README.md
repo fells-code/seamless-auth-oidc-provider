@@ -71,6 +71,7 @@ has the provider disabled or speaks a different version of the `/oidc/*` contrac
 | `POST /interaction/:uid/consent`    | Grants what the client asked for                  |
 | `POST /interaction/:uid/abort`      | Returns `access_denied` to the client             |
 | `/session/end`                      | RP-initiated logout, confirmed on a hosted page   |
+| `/device/auth`, `/device`           | Device authorization grant and its hosted page    |
 
 The interaction routes are for the hosted pages only. A state change needs `Sec-Fetch-Site:
 same-origin` or an `Origin` equal to the issuer's, so a page on a sibling subdomain cannot
@@ -163,6 +164,25 @@ The API holds the keys and sees every way a session ends (this logout, admin rev
 everywhere, eviction), so a client with a `backchannelLogoutUri` gets a `logout+jwt` token
 whichever one it was. Discovery lists `backchannel_logout_supported` and
 `backchannel_logout_session_supported`, and ID tokens for such a client carry `sid`.
+
+## Device authorization grant
+
+`/device/auth` (RFC 8628) is for apps that cannot open a browser: TVs, consoles, CLIs. It is
+off unless an admin enables the device flow on a first-party application (ADR D10).
+
+- **Codes.** User codes are 8 characters from the RFC's base-20 set (`BCDF-GHJK`), about 34.5
+  bits, typed case-insensitively and with or without the dash. They live 10 minutes. The
+  device code works once.
+- **Polling.** The response carries `interval: 5`. A poll sooner than that gets `slow_down`
+  and five more seconds, tracked per device code on each instance.
+- **Approval.** `/device` is a hosted page. Before any sign-in, the confirmation page names the
+  app, shows the code, and says to continue only on a device you started yourself (RFC 8628
+  section 5.4). Every approval signs in again, so a browser that is already signed in still
+  confirms with the passkey. Code entry is limited to 10 a minute per address and 600 a
+  minute per instance.
+- **Assurance.** Device-flow tokens never carry `acr`, after a refresh too, and device requests
+  with `acr_values` or `max_age` are refused. The passkey proves who approved, not who holds
+  the device. The API refuses `acr` on any token whose sign request names the device grant.
 
 ## Security defaults
 
