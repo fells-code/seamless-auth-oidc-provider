@@ -12,7 +12,8 @@ import { errors, type InteractionResults } from 'oidc-provider';
 
 import type { OidcApiClient } from './apiClient.js';
 import { authRequirements, stepUpMethods, unmetRequirements } from './authRequirements.js';
-import { readFirstPartySession } from './firstPartySession.js';
+import { OidcApiError } from './errors.js';
+import { type FirstPartySession, readFirstPartySession } from './firstPartySession.js';
 import { createSameOriginGuard } from './originGuard.js';
 import { bindSession } from './requestContext.js';
 import { grantLifetime } from './tokenLifetimes.js';
@@ -106,6 +107,17 @@ export function createInteractionRouter(options: InteractionRouterOptions): Rout
     return result.session;
   }
 
+  async function bindToClient(session: FirstPartySession, clientId: string) {
+    try {
+      await client.bindSession(session.sessionId, { clientId, accessToken: session.accessToken });
+    } catch (error) {
+      if (error instanceof OidcApiError && error.status < 500) {
+        throw new InteractionRefusal(401, 'login_required');
+      }
+      throw error;
+    }
+  }
+
   router.get(
     '/interaction/:uid/details',
     handle(async (req, res) => {
@@ -156,6 +168,7 @@ export function createInteractionRouter(options: InteractionRouterOptions): Rout
       const found = await clientFor(interaction);
 
       bindSession(session.sessionId);
+      await bindToClient(session, found.clientId);
 
       // The API answers the auth context only for a session holding a grant for the client,
       // so the grant is saved first. It starts empty: the consent step fills it.

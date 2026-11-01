@@ -31,9 +31,24 @@ export interface FakeAccount {
 
 /**
  * The API's provider store, client registry and grant-bound lookups, in memory. It applies
- * the same binding the API does: accounts and auth context answer only for a session that
- * holds a grant for the asking client.
+ * the same binding the API does: accounts, auth context and user token signing answer only
+ * for a session bound to the asking client with the user's access token, that also holds a
+ * grant for it, and only a bound session can be revoked.
  */
+/** The fake first-party access token is unsigned: the fake API only reads its claims. */
+function decodeAccessToken(token: string): Record<string, unknown> | undefined {
+  try {
+    const payload: unknown = JSON.parse(
+      Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8'),
+    );
+    return payload && typeof payload === 'object'
+      ? (payload as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function createFakeStore() {
   const records = new Map<string, StoredRecord>();
   const clients = new Map<string, OidcClientMetadata>();
@@ -44,6 +59,7 @@ export function createFakeStore() {
   const events: Record<string, unknown>[] = [];
   const verified: { clientId: string; secret: string }[] = [];
   const signed: { kind: string; clientId: string; sessionId?: string; grantType?: string }[] = [];
+  const bindings = new Set<string>();
 
   const key = (model: string, id: string) => `${model}/${id}`;
   const live = (record: StoredRecord | undefined) =>
@@ -64,13 +80,20 @@ export function createFakeStore() {
       (record) => record.model === model && record.payload[field] === value,
     );
 
+  function isBound(sessionId: string) {
+    return [...bindings].some((binding) => binding.startsWith(`${sessionId}:`));
+  }
+
   function hasGrant(sessionId: string, clientId: string) {
-    return [...records.values()].some(
-      (record) =>
-        live(record) &&
-        record.model === 'Grant' &&
-        record.sessionId === sessionId &&
-        record.payload.clientId === clientId,
+    return (
+      bindings.has(`${sessionId}:${clientId}`) &&
+      [...records.values()].some(
+        (record) =>
+          live(record) &&
+          record.model === 'Grant' &&
+          record.sessionId === sessionId &&
+          record.payload.clientId === clientId,
+      )
     );
   }
 
@@ -184,8 +207,35 @@ export function createFakeStore() {
       };
       return json(200, context);
     }
+    match = /^\/oidc\/sessions\/([^/]+)\/bind$/.exec(path);
+    if (match && method === 'POST') {
+      const sessionId = decodeURIComponent(match[1]!);
+      const { clientId, accessToken } = body as { clientId: string; accessToken: string };
+      const claims = decodeAccessToken(accessToken);
+      const account = [...accounts.values()].find((a) => a.sessionId === sessionId);
+      if (
+        !claims ||
+        claims.typ !== 'access' ||
+        claims.sid !== sessionId ||
+        !account ||
+        claims.sub !== account.claims.sub
+      ) {
+        return json(403, { error: 'invalid_access_token' });
+      }
+      if (claims.recovery === true) {
+        return json(403, { error: 'enrollment_required' });
+      }
+      if (!clients.has(clientId)) {
+        return json(404, { error: 'Not Found' });
+      }
+      bindings.add(`${sessionId}:${clientId}`);
+      return json(204);
+    }
     match = /^\/oidc\/sessions\/([^/]+)\/revoke$/.exec(path);
     if (match && method === 'POST') {
+      if (!isBound(decodeURIComponent(match[1]!))) {
+        return json(404, { error: 'Not Found' });
+      }
       revokedSessions.push({
         sessionId: decodeURIComponent(match[1]!),
         reason: (body as { reason: string }).reason,
@@ -203,6 +253,12 @@ export function createFakeStore() {
         sessionId?: string;
         grantType?: string;
       };
+      if (
+        request.kind !== 'client_credentials' &&
+        !hasGrant(request.sessionId ?? '', request.clientId)
+      ) {
+        return json(403, { error: 'grant_not_allowed' });
+      }
       signed.push({
         kind: request.kind,
         clientId: request.clientId,
@@ -218,12 +274,16 @@ export function createFakeStore() {
     handle,
     records,
     signed,
+    bindings,
     revokedSessions,
     events,
     /** What the API does when a first-party session ends: its provider records go with it. */
     endSession(sessionId: string) {
       for (const [id, record] of records) {
         if (record.sessionId === sessionId) records.delete(id);
+      }
+      for (const binding of bindings) {
+        if (binding.startsWith(`${sessionId}:`)) bindings.delete(binding);
       }
     },
     addClient(metadata: OidcClientMetadata) {

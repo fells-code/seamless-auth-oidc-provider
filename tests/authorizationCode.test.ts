@@ -8,8 +8,9 @@ import * as oidc from 'openid-client';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { FakeBrowser } from './browser.js';
-import { EDGE_CONFIG, ISSUER } from './fakeApi.js';
+import { EDGE_CONFIG, ISSUER, json } from './fakeApi.js';
 import {
+  ACCESS_COOKIE,
   firstParty,
   follow,
   interactionUid,
@@ -141,6 +142,61 @@ describe('authorization code with PKCE', () => {
       new Set([firstParty.client_id, otherFirstParty.client_id]),
     );
     expect(grants.every((g) => g.sessionId === SESSION)).toBe(true);
+  });
+
+  it('binds the session to the client with the access token the user signed in with', async () => {
+    const config = await relyingParty(started.base, firstParty);
+    const { url } = await startAuthorization(config, firstParty);
+    const uid = interactionUid(await follow(browser, url.href));
+    signIn(browser);
+    await browser.post(`/interaction/${uid}/login`);
+
+    const bind = started.api.requests.find((r) => r.path === `/oidc/sessions/${SESSION}/bind`);
+    const accessToken = (bind?.body as { accessToken?: string } | undefined)?.accessToken;
+    expect(bind?.body).toMatchObject({ clientId: firstParty.client_id });
+    expect(JSON.parse(Buffer.from(accessToken!.split('.')[1]!, 'base64url').toString())).toEqual({
+      sub: USER,
+      typ: 'access',
+      sid: SESSION,
+    });
+    expect([...started.store.bindings]).toEqual([`${SESSION}:${firstParty.client_id}`]);
+  });
+
+  it('sends the user back to sign in when the API will not bind the session', async () => {
+    started.api.on((request) =>
+      request.path.endsWith('/bind') ? json(403, { error: 'invalid_access_token' }) : undefined,
+    );
+    const config = await relyingParty(started.base, firstParty);
+    const { url } = await startAuthorization(config, firstParty);
+    const uid = interactionUid(await follow(browser, url.href));
+    signIn(browser);
+
+    const login = await browser.post(`/interaction/${uid}/login`);
+    expect(login.status).toBe(401);
+    expect(login.json()).toMatchObject({ error: 'login_required' });
+    expect([...started.store.records.values()].some((r) => r.model === 'Grant')).toBe(false);
+  });
+
+  it('asks a second app to sign in again when the browser has no access token to bind with', async () => {
+    const config = await relyingParty(started.base, firstParty);
+    const { url } = await startAuthorization(config, firstParty);
+    const uid = interactionUid(await follow(browser, url.href));
+    signIn(browser);
+    const login = await browser.post(`/interaction/${uid}/login`);
+    await follow(browser, login.json<{ redirectTo: string }>().redirectTo);
+    browser.cookies.delete(ACCESS_COOKIE);
+
+    const otherConfig = await relyingParty(started.base, otherFirstParty);
+    const other = await startAuthorization(otherConfig, otherFirstParty);
+    const next = await follow(browser, other.url.href);
+    expect(next.pathname.startsWith('/interaction/')).toBe(true);
+    expect(started.store.bindings.has(`${SESSION}:${otherFirstParty.client_id}`)).toBe(false);
+
+    signIn(browser);
+    const again = await browser.post(`/interaction/${interactionUid(next)}/login`);
+    const callback = await follow(browser, again.json<{ redirectTo: string }>().redirectTo);
+    expect(callback.origin + callback.pathname).toBe(otherFirstParty.redirect_uris[0]);
+    expect(started.store.bindings.has(`${SESSION}:${otherFirstParty.client_id}`)).toBe(true);
   });
 
   it('refuses PKCE-less requests', async () => {

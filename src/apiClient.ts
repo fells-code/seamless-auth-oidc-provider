@@ -33,6 +33,7 @@ import {
   type OidcPayloadUpsertRequest,
   type OidcPayloadUpsertResponse,
   OidcPayloadUpsertResponseSchema,
+  type OidcSessionBindRequest,
   type OidcSessionRevokeRequest,
   OidcSignRefusalSchema,
   type OidcSignRequest,
@@ -212,7 +213,17 @@ export class OidcApiClient {
     });
   }
 
-  /** Answers only while the session holds a grant for `clientId`, so save the Grant first. */
+  /**
+   * Binds the session to `clientId` with the user's own access token for that session. The
+   * API answers nothing about a session, and signs nothing for it, until it is bound.
+   */
+  async bindSession(sessionId: string, body: OidcSessionBindRequest): Promise<void> {
+    await this.#request('POST', routePath(OidcEdgeRoutes.sessionBind, { id: sessionId }), {
+      body,
+    });
+  }
+
+  /** Answers only while the session is bound to `clientId` and holds a grant for it. */
   authContext(sessionId: string, clientId: string): Promise<OidcAuthContext | undefined> {
     const query = new URLSearchParams({ clientId }).toString();
     const path = routePath(OidcEdgeRoutes.sessionAuthContext, { id: sessionId });

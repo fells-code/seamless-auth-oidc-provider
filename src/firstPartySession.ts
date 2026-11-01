@@ -9,6 +9,8 @@ import { authenticateCookie, verifyCookieJwt } from '@seamless-auth/core';
 export interface FirstPartySession {
   userId: string;
   sessionId: string;
+  /** The API access token the cookie carries, which is what binds the session to a client. */
+  accessToken: string;
 }
 
 export interface FirstPartySessionRejection {
@@ -39,9 +41,16 @@ export function readFirstPartySession(
       },
     };
   }
-  const payload = verifyCookieJwt<{ sessionId?: unknown }>(cookie, cookieSecret);
-  if (typeof payload?.sessionId !== 'string' || !payload.sessionId) {
+  const payload = verifyCookieJwt<{ sessionId?: unknown; token?: unknown }>(cookie, cookieSecret);
+  if (
+    typeof payload?.sessionId !== 'string' ||
+    !payload.sessionId ||
+    typeof payload.token !== 'string' ||
+    !payload.token
+  ) {
     return { rejection: { status: 401, error: 'login_required' } };
   }
-  return { session: { userId: user.id, sessionId: payload.sessionId } };
+  return {
+    session: { userId: user.id, sessionId: payload.sessionId, accessToken: payload.token },
+  };
 }

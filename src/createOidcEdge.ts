@@ -99,6 +99,8 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
       signingKeys,
       cookieKeys: options.cookieKeys,
       renderPage,
+      adapterCookieSecret: options.adapterCookieSecret,
+      accessCookieName: ADAPTER_COOKIE_NAMES.access,
     }),
   );
   leaveBackchannelLogoutToApi(provider);
