@@ -1,5 +1,11 @@
 # @seamless-auth/oidc-provider
 
+## 0.1.1
+
+### Patch Changes
+
+- 1f8803f: Depend on `@seamless-auth/core` and `@seamless-auth/express` ^0.23.0, which carry the fix for proxying the user's identity right after a silent refresh, and build the hosted pages against `@seamless-auth/react` ^0.19.2.
+
 ## 0.1.0
 
 ### Minor Changes
