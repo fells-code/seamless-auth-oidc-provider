@@ -98,6 +98,10 @@ jobs:
           conformance/stack/start.sh
           node conformance/stack/seed.mjs
 
+      - name: Device flow
+        working-directory: conformance
+        run: node runner/device-flow.mjs
+
       - name: Start the conformance suite
         working-directory: conformance/suite
         run: |

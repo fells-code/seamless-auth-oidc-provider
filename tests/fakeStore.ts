@@ -14,6 +14,8 @@ import type {
 
 import { json, type RecordedRequest } from './fakeApi.js';
 
+const DEVICE_CODE_GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
+
 interface StoredRecord {
   model: string;
   id: string;
@@ -252,12 +254,21 @@ export function createFakeStore() {
         clientId: string;
         sessionId?: string;
         grantType?: string;
+        signingInput: string;
       };
       if (
         request.kind !== 'client_credentials' &&
         !hasGrant(request.sessionId ?? '', request.clientId)
       ) {
         return json(403, { error: 'grant_not_allowed' });
+      }
+      // ADR 0001 D10, as the API applies it: a device-flow token states no assurance at all.
+      const claims = decodeAccessToken(request.signingInput) ?? {};
+      if (
+        request.grantType === DEVICE_CODE_GRANT &&
+        ['acr', 'amr', 'auth_time'].some((claim) => claim in claims)
+      ) {
+        return json(403, { error: 'auth_context_mismatch' });
       }
       signed.push({
         kind: request.kind,

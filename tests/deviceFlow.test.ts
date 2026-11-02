@@ -171,7 +171,7 @@ describe('device authorization grant', () => {
     });
   });
 
-  it('signs the device in after approval elsewhere, with no acr in any token', async () => {
+  it('signs the device in after approval elsewhere, with no auth context in any token', async () => {
     const { body } = await authorize();
 
     const pending = await poll(body.device_code);
@@ -197,7 +197,9 @@ describe('device authorization grant', () => {
     const issued = tokens.json<{ id_token: string; refresh_token: string }>();
     const idToken = payloadOf(issued.id_token);
     expect(idToken).toMatchObject({ sub: expect.any(String), aud: tv.client_id });
-    expect(idToken).not.toHaveProperty('acr');
+    for (const claim of ['acr', 'amr', 'auth_time']) {
+      expect(idToken).not.toHaveProperty(claim);
+    }
     expect(started.store.signed.at(-1)).toEqual({
       kind: 'id_token',
       clientId: tv.client_id,
@@ -211,7 +213,10 @@ describe('device authorization grant', () => {
       refresh_token: issued.refresh_token,
     });
     expect(refreshed.status).toBe(200);
-    expect(payloadOf(refreshed.json<{ id_token: string }>().id_token)).not.toHaveProperty('acr');
+    const refreshedIdToken = payloadOf(refreshed.json<{ id_token: string }>().id_token);
+    for (const claim of ['acr', 'amr', 'auth_time']) {
+      expect(refreshedIdToken).not.toHaveProperty(claim);
+    }
     expect(started.store.signed.at(-1)?.grantType).toBe(DEVICE_CODE_GRANT);
 
     // The device code works once.

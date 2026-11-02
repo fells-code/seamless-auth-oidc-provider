@@ -49,6 +49,18 @@ in `expected.json`, or when a listed expectation no longer happens. `WARNING`, `
 summary explains them. The job summary, every plan's HTML export, the screenshots and the
 service logs are uploaded as the `openid-conformance-results` artifact.
 
+## Device flow
+
+The suite has no plan for the device grant, so [`runner/device-flow.mjs`](runner/device-flow.mjs)
+runs it on the same stack before the plans: a device asks for `openid`, a browser approves it
+with a passkey, and the device's tokens, first and refreshed, must carry no `acr`, `amr` or
+`auth_time` (ADR 0001 D10), which the API refuses to sign on a device-flow token. Its client,
+`conformance-device`, is seeded by `seed.mjs`. Run it locally after `seed.mjs`:
+
+```bash
+(cd conformance && node runner/device-flow.mjs)
+```
+
 ## Running it locally
 
 Needs Docker, Node from `.nvmrc`, and a built `seamless-auth-api` checkout.
