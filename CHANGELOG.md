@@ -1,5 +1,15 @@
 # @seamless-auth/oidc-provider
 
+## 0.3.0
+
+### Minor Changes
+
+- 047779c: A user's JWT access token for a resource (RFC 9068) now carries the session's `acr`, `amr` and `auth_time`, the same values the ID token states, and introspection returns them. A resource server can require a recent phishing-resistant sign-in on a route from the token alone (RFC 9470), and a refreshed token carries the session's current values, so a step-up shows on the next refresh. Device-flow and client credentials tokens carry none of the three, and opaque `/userinfo` tokens are unchanged. Needs no API change: Seamless Auth API 0.22.0 signs these claims and checks them against the session.
+
+### Patch Changes
+
+- 7c86020: Device-flow ID tokens no longer carry the approving session's `amr` and `auth_time`, first or after a refresh. Seamless Auth API 0.22.0 refuses to sign any device-flow token that states `acr`, `amr` or `auth_time` (ADR 0001 D10), so a device-flow request asking for `openid` ended in `server_error` against it.
+
 ## 0.2.0
 
 ### Minor Changes
