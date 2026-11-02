@@ -49,16 +49,23 @@ in `expected.json`, or when a listed expectation no longer happens. `WARNING`, `
 summary explains them. The job summary, every plan's HTML export, the screenshots and the
 service logs are uploaded as the `openid-conformance-results` artifact.
 
-## Device flow
+## Device flow and resource tokens
 
-The suite has no plan for the device grant, so [`runner/device-flow.mjs`](runner/device-flow.mjs)
-runs it on the same stack before the plans: a device asks for `openid`, a browser approves it
-with a passkey, and the device's tokens, first and refreshed, must carry no `acr`, `amr` or
-`auth_time` (ADR 0001 D10), which the API refuses to sign on a device-flow token. Its client,
-`conformance-device`, is seeded by `seed.mjs`. Run it locally after `seed.mjs`:
+The suite has no plan for the device grant or for access tokens for a resource, so two scripts
+run them on the same stack before the plans, each signing a new account in with a passkey:
+
+- [`runner/device-flow.mjs`](runner/device-flow.mjs): a device asks for `openid` and a
+  resource, and its tokens, first and refreshed, must carry no `acr`, `amr` or `auth_time`
+  (ADR 0001 D10), which the API refuses to sign on a device-flow token.
+- [`runner/resource-token.mjs`](runner/resource-token.mjs): an app asks for a resource with
+  the code flow, and the RFC 9068 access token, first and refreshed, must carry the same `acr`,
+  `amr` and `auth_time` as the ID token, which introspection returns too (ADR 0002 N7).
+
+Their clients (`conformance-device`, `conformance-resource`) and the resource
+`https://api.seamless.test` are seeded by `seed.mjs`. Run them locally after `seed.mjs`:
 
 ```bash
-(cd conformance && node runner/device-flow.mjs)
+(cd conformance && node runner/device-flow.mjs && node runner/resource-token.mjs)
 ```
 
 ## Running it locally

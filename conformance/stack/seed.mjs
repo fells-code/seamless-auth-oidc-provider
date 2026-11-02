@@ -132,6 +132,19 @@ statements.push(`INSERT INTO oidc_clients (id, name, "firstParty", "clientType",
 VALUES ('conformance-device', 'Conformance Device', true, 'public', 'none', '[]', '[]', ${json(['urn:ietf:params:oauth:grant-type:device_code', 'refresh_token'])}, true, now(), now())
 ON CONFLICT (id) DO NOTHING;`);
 
+// For runner/resource-token.mjs: a public app with a resource, which the device client may use too.
+statements.push(`INSERT INTO oidc_clients (id, name, "firstParty", "clientType", "tokenEndpointAuthMethod", "redirectUris", "postLogoutRedirectUris", "grantTypes", "createdAt", "updatedAt")
+VALUES ('conformance-resource', 'Conformance Resource', true, 'public', 'none', ${json(['https://app.seamless.test/callback'])}, '[]', ${json(['authorization_code', 'refresh_token'])}, now(), now())
+ON CONFLICT (id) DO NOTHING;
+INSERT INTO oidc_resources (id, identifier, name, scopes, "createdAt", "updatedAt")
+VALUES (gen_random_uuid(), 'https://api.seamless.test', 'Conformance API', ${json(['library:read'])}, now(), now())
+ON CONFLICT (identifier) DO NOTHING;
+INSERT INTO oidc_client_resources (id, "clientId", "resourceId", scopes, "createdAt", "updatedAt")
+SELECT gen_random_uuid(), c.id, r.id, ${json(['library:read'])}, now(), now()
+FROM oidc_clients c, oidc_resources r
+WHERE c.id IN ('conformance-resource', 'conformance-device') AND r.identifier = 'https://api.seamless.test'
+ON CONFLICT ("clientId", "resourceId") DO NOTHING;`);
+
 // An API without the opt-out has no such columns, and then every client requires PKCE.
 const optedOut = clients.filter((c) => c.optOut).map((c) => sql(c.id));
 statements.push(`DO $$ BEGIN

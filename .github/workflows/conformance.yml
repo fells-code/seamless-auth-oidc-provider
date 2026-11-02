@@ -98,9 +98,11 @@ jobs:
           conformance/stack/start.sh
           node conformance/stack/seed.mjs
 
-      - name: Device flow
+      - name: Device flow and resource tokens
         working-directory: conformance
-        run: node runner/device-flow.mjs
+        run: |
+          node runner/device-flow.mjs
+          node runner/resource-token.mjs
 
       - name: Start the conformance suite
         working-directory: conformance/suite

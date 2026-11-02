@@ -12,6 +12,7 @@ import {
   type KoaContextWithOIDC,
 } from 'oidc-provider';
 
+import { accessTokenAuthContext } from './accessTokenClaims.js';
 import { createApiAdapterFactory } from './adapter.js';
 import type { OidcApiClient } from './apiClient.js';
 import {
@@ -350,6 +351,7 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
       device_authorization: '/device/auth',
     },
     formats: { customizers: { jwt: storeJwtAccessToken } },
+    extraTokenClaims: accessTokenAuthContext,
     ttl: {
       // Functions, so the resource's and the application's own lifetimes apply.
       AccessToken: accessTokenTtl,

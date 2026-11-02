@@ -226,6 +226,9 @@ describe('client credentials', () => {
       client_id: machine.client_id,
       scope: 'orders:read',
     });
+    for (const claim of ['acr', 'amr', 'auth_time']) {
+      expect(claims).not.toHaveProperty(claim);
+    }
     expect([120 - 1, 120]).toContain(tokens.expires_in);
     expect(started.store.signed).toEqual([
       { kind: 'client_credentials', clientId: machine.client_id },
