@@ -105,6 +105,14 @@ and `jti`, with only the scopes the application is allowed there and the resourc
 lifetime. The API checks the same links again before it signs, so an API configured for one
 identifier can reject every token minted for another.
 
+A user's token for a resource also carries the session's `acr`, `amr` and `auth_time` (RFC
+9068 section 2.2.1), the values the ID token states, and introspection returns them. An API can
+then require a recent phishing-resistant sign-in on a route from the token alone, and answer
+`insufficient_user_authentication` (RFC 9470) when it falls short. A refreshed token carries the
+session's current values, so a step-up shows on the next refresh. The API signs only the values
+the session holds, so the edge cannot raise them. Device-flow and client credentials tokens
+carry none of the three, and an opaque `/userinfo` token gains nothing.
+
 - A resource the application is not linked to is refused with `invalid_target`.
 - An app that named one resource at authorization gets its token without repeating
   `resource` at the token endpoint.
@@ -130,9 +138,9 @@ ends every record when the first-party session behind it ends.
   tokens rotate on every use. A used one presented again revokes the grant and every token
   under it, and the API ends the first-party session it was issued under. Two refreshes
   racing with the same token cannot both rotate: the API's consume says which one marked it
-  used, and the other is handled as that same reuse. A refreshed ID
-  token carries the session's current `acr`, `amr` and `auth_time`, so a step-up since the
-  sign-in shows up on the next refresh.
+  used, and the other is handled as that same reuse. A refreshed ID token, and a refreshed
+  access token for a resource, carry the session's current `acr`, `amr` and `auth_time`, so a
+  step-up since the sign-in shows up on the next refresh.
 - **Client credentials.** A confidential client registered for `client_credentials` gets an
   RFC 9068 JWT whose `sub` and `client_id` are the client itself, only ever for a resource:
   the one named with `resource`, or the client's only linked resource. Scopes are cut to what
@@ -192,9 +200,10 @@ off unless an admin enables the device flow on a first-party application (ADR D1
   section 5.4). Every approval signs in again, so a browser that is already signed in still
   confirms with the passkey. Code entry is limited to 10 a minute per address and 600 a
   minute per instance.
-- **Assurance.** Device-flow tokens never carry `acr`, after a refresh too, and device requests
-  with `acr_values` or `max_age` are refused. The passkey proves who approved, not who holds
-  the device. The API refuses `acr` on any token whose sign request names the device grant.
+- **Assurance.** Device-flow tokens never carry `acr`, `amr` or `auth_time`, after a refresh
+  too, and device requests with `acr_values` or `max_age` are refused. The passkey proves who
+  approved, not who holds the device. The API refuses all three on any token whose sign request
+  names the device grant.
 
 ## Security defaults
 

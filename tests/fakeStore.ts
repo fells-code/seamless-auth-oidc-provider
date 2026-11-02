@@ -54,7 +54,7 @@ function decodeAccessToken(token: string): Record<string, unknown> | undefined {
 export function createFakeStore() {
   const records = new Map<string, StoredRecord>();
   const clients = new Map<string, OidcClientMetadata>();
-  const accounts = new Map<string, FakeAccount>();
+  const accounts = new Map<string, FakeAccount & { addedAt: number }>();
   const secrets = new Map<string, string>();
   const resources = new Map<string, OidcClientResource[]>();
   const revokedSessions: { sessionId: string; reason: string }[] = [];
@@ -97,6 +97,31 @@ export function createFakeStore() {
           record.payload.clientId === clientId,
       )
     );
+  }
+
+  function contextFor(sessionId: string): OidcAuthContext | undefined {
+    const account = [...accounts.values()].find((a) => a.sessionId === sessionId);
+    if (!account) {
+      return undefined;
+    }
+    return {
+      sessionId,
+      userId: account.claims.sub,
+      active: true,
+      recovery: false,
+      authMethods: [
+        {
+          method: 'passkey',
+          at: new Date(account.addedAt * 1000).toISOString(),
+          deviceBound: true,
+          userVerified: true,
+        },
+      ],
+      authTime: account.addedAt,
+      acr: 'phrh',
+      amr: ['hwk', 'user', 'mfa'],
+      ...account.context,
+    };
   }
 
   function handle({ method, path, search, body }: RecordedRequest): Response | undefined {
@@ -185,28 +210,10 @@ export function createFakeStore() {
     match = /^\/oidc\/sessions\/([^/]+)\/auth-context$/.exec(path);
     if (match && method === 'GET') {
       const sessionId = decodeURIComponent(match[1]!);
-      const account = [...accounts.values()].find((a) => a.sessionId === sessionId);
-      if (!account || !hasGrant(sessionId, params.get('clientId') ?? '')) {
+      const context = contextFor(sessionId);
+      if (!context || !hasGrant(sessionId, params.get('clientId') ?? '')) {
         return json(404, { error: 'Not Found' });
       }
-      const context: OidcAuthContext = {
-        sessionId,
-        userId: account.claims.sub,
-        active: true,
-        recovery: false,
-        authMethods: [
-          {
-            method: 'passkey',
-            at: new Date().toISOString(),
-            deviceBound: true,
-            userVerified: true,
-          },
-        ],
-        authTime: Math.floor(Date.now() / 1000) - 5,
-        acr: 'phrh',
-        amr: ['hwk', 'user', 'mfa'],
-        ...account.context,
-      };
       return json(200, context);
     }
     match = /^\/oidc\/sessions\/([^/]+)\/bind$/.exec(path);
@@ -262,13 +269,26 @@ export function createFakeStore() {
       ) {
         return json(403, { error: 'grant_not_allowed' });
       }
-      // ADR 0001 D10, as the API applies it: a device-flow token states no assurance at all.
+      // As the API checks them: a client credentials or device-flow token (ADR 0001 D10) states
+      // no assurance at all, and any other token only the session's own.
       const claims = decodeAccessToken(request.signingInput) ?? {};
-      if (
-        request.grantType === DEVICE_CODE_GRANT &&
-        ['acr', 'amr', 'auth_time'].some((claim) => claim in claims)
-      ) {
-        return json(403, { error: 'auth_context_mismatch' });
+      const stated = ['acr', 'amr', 'auth_time'].filter((claim) => claim in claims);
+      if (request.kind === 'client_credentials' || request.grantType === DEVICE_CODE_GRANT) {
+        if (stated.length > 0) {
+          return json(403, { error: 'auth_context_mismatch' });
+        }
+      } else {
+        const context = contextFor(request.sessionId ?? '');
+        const amr = Array.isArray(claims.amr) ? [...(claims.amr as string[])].sort() : claims.amr;
+        if (
+          !context ||
+          (claims.acr !== undefined && claims.acr !== context.acr) ||
+          (claims.amr !== undefined &&
+            JSON.stringify(amr) !== JSON.stringify([...context.amr].sort())) ||
+          (claims.auth_time !== undefined && claims.auth_time !== context.authTime)
+        ) {
+          return json(403, { error: 'auth_context_mismatch' });
+        }
       }
       signed.push({
         kind: request.kind,
@@ -308,7 +328,8 @@ export function createFakeStore() {
       resources.set(clientId, list);
     },
     addAccount(account: FakeAccount) {
-      accounts.set(account.claims.sub, account);
+      // A fixed sign-in time, as a real session's is, so /oidc/sign can compare auth_time.
+      accounts.set(account.claims.sub, { ...account, addedAt: Math.floor(Date.now() / 1000) - 5 });
     },
   };
 }

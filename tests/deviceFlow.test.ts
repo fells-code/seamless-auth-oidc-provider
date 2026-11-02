@@ -226,6 +226,42 @@ describe('device authorization grant', () => {
     expect(['already_used', 'not_found']).toContain(again.error);
   });
 
+  it('states no auth context on a JWT access token for a resource, refreshed too', async () => {
+    started.store.setResources(tv.client_id, [
+      {
+        identifier: 'https://media.example.com',
+        scopes: ['media:play'],
+        accessTokenTtlSeconds: null,
+      },
+    ]);
+    const { body } = await authorize({
+      scope: 'openid offline_access media:play',
+      resource: 'https://media.example.com',
+    });
+    await approve(body.user_code);
+
+    const tokens = await poll(body.device_code);
+    expect(tokens.status).toBe(200);
+    const issued = tokens.json<{ access_token: string; refresh_token: string }>();
+    const refreshed = await post('/token', {
+      client_id: tv.client_id,
+      grant_type: 'refresh_token',
+      refresh_token: issued.refresh_token,
+    });
+    expect(refreshed.status).toBe(200);
+
+    for (const token of [
+      issued.access_token,
+      refreshed.json<{ access_token: string }>().access_token,
+    ]) {
+      const claims = payloadOf(token);
+      expect(claims).toMatchObject({ aud: 'https://media.example.com', sub: USER });
+      for (const claim of ['acr', 'amr', 'auth_time']) {
+        expect(claims).not.toHaveProperty(claim);
+      }
+    }
+  });
+
   it('approves from a browser already signed in to another app', async () => {
     const config = await relyingParty(started.base, firstParty);
     const flow = await startAuthorization(config, firstParty);
