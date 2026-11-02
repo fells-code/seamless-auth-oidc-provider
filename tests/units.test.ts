@@ -69,7 +69,7 @@ describe('readFirstPartySession', () => {
   it('reads the user and session from the adapter cookie', () => {
     const cookie = firstPartyCookie(SECRET, { sub: 'u1', sessionId: 's1' });
     expect(readFirstPartySession(cookie, SECRET)).toEqual({
-      session: { userId: 'u1', sessionId: 's1' },
+      session: { userId: 'u1', sessionId: 's1', accessToken: expect.stringMatching(/\.sig$/) },
     });
   });
 
@@ -114,6 +114,8 @@ describe('clientBasedCORS', () => {
     configCache: new EdgeConfigCache(client, EDGE_CONFIG),
     signingKeys: [new ApiSigningKey({ ...jwk, kid: 'k', alg: 'RS256' }, client, true)],
     cookieKeys: [],
+    adapterCookieSecret: 'adapter-cookie-secret-that-is-at-least-32-chars',
+    accessCookieName: '__Host-seamless-access',
   });
   const cors = configuration.clientBasedCORS!;
   const ctx = (route: string) => ({ oidc: { route } }) as unknown as KoaContextWithOIDC;

@@ -23,6 +23,8 @@ import {
 } from './authRequirements.js';
 import type { EdgeConfigCache } from './configCache.js';
 import { createDevicePages, DEVICE_CODE_TTL_SECONDS } from './deviceFlow.js';
+import { OidcApiError } from './errors.js';
+import { readFirstPartySession } from './firstPartySession.js';
 import type { HostedPageRenderer } from './hostedPages.js';
 import { FIRST_PARTY_CLIENT_PROPERTY } from './interactions.js';
 import { storeJwtAccessToken } from './jwtAccessTokens.js';
@@ -61,6 +63,8 @@ export interface ProviderConfigurationInput {
   cookieKeys: string[];
   configCache: EdgeConfigCache;
   renderPage: HostedPageRenderer;
+  adapterCookieSecret: string;
+  accessCookieName: string;
 }
 
 // The routes where the library loads the browser session's account before the grant. The
@@ -158,7 +162,43 @@ function adoptAuthContext(session: ProviderSession, context: OidcAuthContext): v
  * copy of the login and want an exact acr match. The API's auth context is the record: it
  * moves with every step-up, and /oidc/sign refuses any acr, amr or auth_time that differs.
  */
-export function authContextCheck(client: OidcApiClient) {
+export interface FirstPartyCookie {
+  adapterCookieSecret: string;
+  accessCookieName: string;
+}
+
+/**
+ * A provider session signing in to another client rides the user's first-party session,
+ * which the API knows nothing about for that client until it is bound. The access cookie
+ * the browser sent is what binds it, so a session that has no fresh one signs in again.
+ */
+async function bindFromCookie(
+  ctx: KoaContextWithOIDC,
+  client: OidcApiClient,
+  cookie: FirstPartyCookie,
+  sessionId: string,
+  accountId: string,
+  clientId: string,
+): Promise<OidcAuthContext | undefined> {
+  const { session } = readFirstPartySession(
+    ctx.cookies.get(cookie.accessCookieName),
+    cookie.adapterCookieSecret,
+  );
+  if (!session || session.sessionId !== sessionId || session.userId !== accountId) {
+    return undefined;
+  }
+  try {
+    await client.bindSession(sessionId, { clientId, accessToken: session.accessToken });
+  } catch (error) {
+    if (error instanceof OidcApiError && error.status < 500) {
+      return undefined;
+    }
+    throw error;
+  }
+  return client.authContext(sessionId, clientId);
+}
+
+export function authContextCheck(client: OidcApiClient, cookie: FirstPartyCookie) {
   return new interactionPolicy.Check(
     'auth_context',
     'the requested authentication could not be obtained',
@@ -181,26 +221,28 @@ export function authContextCheck(client: OidcApiClient) {
           : interactionPolicy.Check.NO_NEED_TO_PROMPT;
       }
       const sessionId = currentRequestContext()?.sessionId;
-      const context = sessionId
-        ? await client.authContext(sessionId, oidc.client.clientId)
-        : undefined;
-      if (context) {
-        if (!context.active || context.recovery || context.userId !== accountId) {
-          return interactionPolicy.Check.REQUEST_PROMPT;
-        }
-        adoptAuthContext(oidc.session, context);
+      if (!sessionId) {
+        return interactionPolicy.Check.REQUEST_PROMPT;
       }
+      const clientId = oidc.client.clientId;
+      const context =
+        (await client.authContext(sessionId, clientId)) ??
+        (await bindFromCookie(ctx, client, cookie, sessionId, accountId, clientId));
+      if (!context || !context.active || context.recovery || context.userId !== accountId) {
+        return interactionPolicy.Check.REQUEST_PROMPT;
+      }
+      adoptAuthContext(oidc.session, context);
       if (!hasRequirements(requirements)) {
         return interactionPolicy.Check.NO_NEED_TO_PROMPT;
       }
-      return !context || unmetRequirements(requirements, context)
+      return unmetRequirements(requirements, context)
         ? interactionPolicy.Check.REQUEST_PROMPT
         : interactionPolicy.Check.NO_NEED_TO_PROMPT;
     },
   );
 }
 
-export function buildInteractionPolicy(client: OidcApiClient) {
+export function buildInteractionPolicy(client: OidcApiClient, cookie: FirstPartyCookie) {
   const policy = interactionPolicy.base();
   const login = policy.get('login');
   if (!login) {
@@ -209,7 +251,7 @@ export function buildInteractionPolicy(client: OidcApiClient) {
   for (const reason of ['max_age', 'essential_acrs', 'essential_acr']) {
     login.checks.remove(reason);
   }
-  login.checks.add(authContextCheck(client));
+  login.checks.add(authContextCheck(client, cookie));
   return policy;
 }
 
@@ -328,7 +370,7 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
       short: { httpOnly: true, sameSite: 'lax', secure: true, path: '/' },
     },
     interactions: {
-      policy: buildInteractionPolicy(input.client),
+      policy: buildInteractionPolicy(input.client, input),
       url: (_ctx, interaction) => `/interaction/${interaction.uid}`,
     },
     clientBasedCORS: (ctx, origin, client) => {

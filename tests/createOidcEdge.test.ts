@@ -232,6 +232,8 @@ describe('buildProviderConfiguration', () => {
         configCache,
         signingKeys: [],
         cookieKeys: [],
+        adapterCookieSecret: 'adapter-cookie-secret-that-is-at-least-32-chars',
+        accessCookieName: '__Host-seamless-access',
       }),
     ).toThrow(/No provider signing key/);
   });
@@ -247,6 +249,8 @@ describe('buildProviderConfiguration', () => {
         configCache,
         signingKeys: [key],
         cookieKeys: [],
+        adapterCookieSecret: 'adapter-cookie-secret-that-is-at-least-32-chars',
+        accessCookieName: '__Host-seamless-access',
       }),
     ).toThrow(/unsupported alg RS1/);
   });
@@ -260,6 +264,8 @@ describe('buildProviderConfiguration', () => {
       configCache,
       signingKeys: [new ApiSigningKey({ ...jwk, kid: 'k', alg: 'RS256' }, client, true)],
       cookieKeys: [],
+      adapterCookieSecret: 'adapter-cookie-secret-that-is-at-least-32-chars',
+      accessCookieName: '__Host-seamless-access',
     });
     const ctx = {} as KoaContextWithOIDC;
     expect(configuration.pkce?.required?.(ctx, {} as never)).toBe(true);
