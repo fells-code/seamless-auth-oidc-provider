@@ -14,11 +14,22 @@ createServer((req, res) => {
       res.end(JSON.stringify(inbox.get(to) ?? []));
       return;
     }
-    const params = new URLSearchParams(body);
-    const to = params.get('Destination.ToAddresses.member.1');
-    const text = [params.get('Message.Body.Text.Data'), params.get('Message.Body.Html.Data')].join(
-      '\n',
-    );
+    // SESv2 (@seamless-auth/messaging-aws) sends JSON; the v1 query API sends a form.
+    const v2 = req.url.startsWith('/v2/email/outbound-emails');
+    let to;
+    let text;
+    if (v2) {
+      const message = JSON.parse(body);
+      const content = message.Content?.Simple?.Body ?? {};
+      to = message.Destination?.ToAddresses?.[0];
+      text = [content.Text?.Data, content.Html?.Data].join('\n');
+    } else {
+      const params = new URLSearchParams(body);
+      to = params.get('Destination.ToAddresses.member.1');
+      text = [params.get('Message.Body.Text.Data'), params.get('Message.Body.Html.Data')].join(
+        '\n',
+      );
+    }
     const code = /code is: ([A-Z0-9]{6})/.exec(text)?.[1] ?? null;
     if (to) inbox.set(to, [...(inbox.get(to) ?? []), { code, at: Date.now() }]);
     console.log(
@@ -30,6 +41,11 @@ createServer((req, res) => {
           .replace(/\s+/g, ' ')
           .slice(0, 300)}`,
     );
+    if (v2) {
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ MessageId: 'm-1' }));
+      return;
+    }
     res.setHeader('content-type', 'text/xml');
     res.end(
       '<SendEmailResponse xmlns="http://ses.amazonaws.com/doc/2010-12-01/"><SendEmailResult><MessageId>m-1</MessageId></SendEmailResult><ResponseMetadata><RequestId>r-1</RequestId></ResponseMetadata></SendEmailResponse>',

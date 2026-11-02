@@ -127,6 +127,11 @@ VALUES (${sql(c.id)}, ${sql(c.id)}, true, 'confidential', ${sql(c.method)}, ${c.
 ON CONFLICT (id) DO UPDATE SET jwks = EXCLUDED.jwks, "secretLookup" = EXCLUDED."secretLookup", "redirectUris" = EXCLUDED."redirectUris", "postLogoutRedirectUris" = EXCLUDED."postLogoutRedirectUris", "backchannelLogoutUri" = EXCLUDED."backchannelLogoutUri", "tokenEndpointAuthMethod" = EXCLUDED."tokenEndpointAuthMethod";`,
 );
 
+// For runner/device-flow.mjs. The API grants the device flow to first-party clients only.
+statements.push(`INSERT INTO oidc_clients (id, name, "firstParty", "clientType", "tokenEndpointAuthMethod", "redirectUris", "postLogoutRedirectUris", "grantTypes", "deviceFlowEnabled", "createdAt", "updatedAt")
+VALUES ('conformance-device', 'Conformance Device', true, 'public', 'none', '[]', '[]', ${json(['urn:ietf:params:oauth:grant-type:device_code', 'refresh_token'])}, true, now(), now())
+ON CONFLICT (id) DO NOTHING;`);
+
 // An API without the opt-out has no such columns, and then every client requires PKCE.
 const optedOut = clients.filter((c) => c.optOut).map((c) => sql(c.id));
 statements.push(`DO $$ BEGIN

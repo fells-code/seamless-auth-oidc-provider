@@ -116,6 +116,8 @@ export class ApiPayloadAdapter implements Adapter {
       }
       // ADR D10: never carried into the device's tokens, whatever the approver earned.
       delete stored.acr;
+      delete stored.amr;
+      delete stored.authTime;
     }
     const { created } = await this.#client.upsertPayload(model, id, {
       payload: stored,
@@ -162,9 +164,15 @@ export class ApiPayloadAdapter implements Adapter {
   /**
    * A refresh carries the acr, amr and auth_time of the session's current row, not the ones
    * the token was first issued with: a step-up since then moved them, and `/oidc/sign`
-   * refuses any value that differs from the row.
+   * refuses any value that differs from the row. A device grant carries none (ADR D10).
    */
   async #adoptCurrentAuthContext(payload: AdapterPayload, sessionId: string): Promise<void> {
+    if (isDeviceGrant(payload)) {
+      delete payload.acr;
+      delete payload.amr;
+      delete payload.authTime;
+      return;
+    }
     const { clientId, accountId } = payload;
     if (typeof clientId !== 'string') {
       return;
@@ -174,7 +182,7 @@ export class ApiPayloadAdapter implements Adapter {
       return;
     }
     payload.authTime = context.authTime;
-    if (context.acr && !isDeviceGrant(payload)) {
+    if (context.acr) {
       payload.acr = context.acr;
     } else {
       delete payload.acr;
