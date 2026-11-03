@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 import { createSeamlessAuthServer } from '@seamless-auth/express';
 import type { OidcEdgeConfigResponse } from '@seamless-auth/types';
-import express, { type Router } from 'express';
+import express, { type NextFunction, type Request, type Response, type Router } from 'express';
 import Provider from 'oidc-provider';
 
 import { OidcApiClient } from './apiClient.js';
@@ -26,7 +26,7 @@ import { createRateLimiter } from './rateLimit.js';
 import { revokeSessionOnRefreshReuse } from './refreshReuse.js';
 import { runWithRequestContext } from './requestContext.js';
 import { hostOnlyResumeCookie } from './resumeCookie.js';
-import { signingKeysFrom } from './signingKey.js';
+import { SigningKeyRing } from './signingKey.js';
 import { checkApiCompatibility } from './startup.js';
 import { auditRevocations } from './tokenAudit.js';
 
@@ -57,6 +57,11 @@ export interface OidcEdgeOptions {
    * `trust proxy` set to match.
    */
   trustProxy?: boolean;
+  /**
+   * How often to re-read the API's provider keys, so a rotation is picked up. A key the API
+   * refuses as unknown reloads them at once as well. `0` turns the timer off.
+   */
+  signingKeyRefreshMs?: number;
   /** `false` keeps the adapter on its bundled route manifest. */
   fetchAdapterManifest?: boolean;
   /** The built hosted pages. Defaults to the copy this package ships in `dist/ui`. */
@@ -83,7 +88,10 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
 
   const config = await checkApiCompatibility(client);
   const configCache = new EdgeConfigCache(client, config);
-  const signingKeys = signingKeysFrom(await client.jwks(), client);
+  const signingKeys = new SigningKeyRing(await client.jwks(), client);
+  if (options.signingKeyRefreshMs !== 0) {
+    signingKeys.startRefresh(options.signingKeyRefreshMs);
+  }
   const hostedPages = {
     uiDir: options.uiDir ?? fileURLToPath(new URL('./ui/', import.meta.url)),
     configCache,
@@ -96,7 +104,7 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
       client,
       config,
       configCache,
-      signingKeys,
+      signingKeys: signingKeys.providerKeys,
       cookieKeys: options.cookieKeys,
       renderPage,
       adapterCookieSecret: options.adapterCookieSecret,
@@ -111,11 +119,18 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
   provider.use(auditRevocations(client));
   provider.use(endFirstPartySessionOnLogout(client, Object.values(ADAPTER_COOKIE_NAMES)));
   provider.use(
-    acceptJwtAccessTokens(createJwtAccessTokenLookup(signingKeys, config.issuer), [
-      '/token/introspection',
-      '/token/revocation',
-    ]),
+    acceptJwtAccessTokens(
+      createJwtAccessTokenLookup(() => signingKeys.keys, config.issuer),
+      ['/token/introspection', '/token/revocation'],
+    ),
   );
+  // The library publishes the keys it was started with; this serves the API's current set.
+  provider.use(async (ctx, next) => {
+    await next();
+    if (ctx.oidc?.route === 'jwks' && ctx.status === 200) {
+      ctx.body = { keys: signingKeys.publicJwks };
+    }
+  });
   // The library answers a bare server_error and logs nothing, so this is the only trace.
   provider.on('server_error', (_ctx, error: Error) => {
     console.error(`[oidc-provider] ${error.name}: ${error.message}`);
@@ -200,6 +215,31 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
   router.post(`${issuerBase}/device`, ...userCodeLimiters);
 
   router.use(issuerUrl.pathname, provider.callback());
+  router.use(jsonErrorHandler);
 
   return { router, provider, issuer: config.issuer, config, client };
+}
+
+/**
+ * Express's own handler answers HTML, with a stack trace whenever `NODE_ENV` is not
+ * production. A client error from a body parser keeps its status; anything else is logged
+ * by name and message only, and answered as a bare `server_error`.
+ */
+function jsonErrorHandler(error: unknown, _req: Request, res: Response, next: NextFunction) {
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
+  const status =
+    typeof error === 'object' && error !== null && 'status' in error
+      ? Number(error.status)
+      : undefined;
+  if (status !== undefined && status >= 400 && status < 500) {
+    res.status(status).json({ error: 'invalid_request' });
+    return;
+  }
+  const name = error instanceof Error ? error.name : 'Error';
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`[oidc-provider] ${name}: ${message}`);
+  res.status(500).json({ error: 'server_error' });
 }

@@ -7,6 +7,7 @@
 import type { OidcAuthContext, OidcEdgeConfigResponse } from '@seamless-auth/types';
 import {
   type Configuration,
+  type ExternalSigningKey,
   type FindAccount,
   interactionPolicy,
   type KoaContextWithOIDC,
@@ -33,7 +34,6 @@ import { createLogoutPages } from './logout.js';
 import { NONCE_REQUIRED_PROPERTY, PKCE_REQUIRED_PROPERTY, pkceRequired } from './pkce.js';
 import { currentRequestContext } from './requestContext.js';
 import { createResourceIndicators } from './resourceServers.js';
-import type { ApiSigningKey } from './signingKey.js';
 import {
   accessTokenTtl,
   CLIENT_TTL_PROPERTIES,
@@ -60,7 +60,8 @@ function isAsymmetricAlg(alg: string): alg is AsymmetricAlg {
 export interface ProviderConfigurationInput {
   client: OidcApiClient;
   config: OidcEdgeConfigResponse;
-  signingKeys: ApiSigningKey[];
+  /** The active key first. */
+  signingKeys: ExternalSigningKey[];
   cookieKeys: string[];
   configCache: EdgeConfigCache;
   renderPage: HostedPageRenderer;
@@ -287,7 +288,7 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
   if (!activeKey) {
     throw new Error('No provider signing key is available');
   }
-  const activeAlg = activeKey.alg;
+  const activeAlg = activeKey.alg ?? '';
   if (!isAsymmetricAlg(activeAlg)) {
     throw new Error(`The active provider key uses unsupported alg ${activeAlg}`);
   }

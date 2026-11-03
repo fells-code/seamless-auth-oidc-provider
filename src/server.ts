@@ -20,12 +20,12 @@ async function main() {
     ...(env.SEAMLESS_JWKS_KID ? { serviceTokenKid: env.SEAMLESS_JWKS_KID } : {}),
     cookieKeys: env.OIDC_COOKIE_KEYS,
     adapterCookieSecret: env.SEAMLESS_COOKIE_SECRET,
-    trustProxy: env.TRUST_PROXY,
+    trustProxy: env.TRUST_PROXY !== false,
   });
 
   const app = express();
   app.disable('x-powered-by');
-  app.set('trust proxy', env.TRUST_PROXY ? 1 : false);
+  app.set('trust proxy', env.TRUST_PROXY);
   app.get('/healthz', (_req, res) => {
     res.json({ status: 'ok' });
   });

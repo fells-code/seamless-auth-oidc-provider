@@ -12,7 +12,7 @@ import {
   type OidcPayloadRecord,
 } from '@seamless-auth/types';
 import type { Adapter, AdapterFactory, AdapterPayload } from 'oidc-provider';
-import { errors } from 'oidc-provider';
+import Provider, { errors } from 'oidc-provider';
 
 import type { OidcApiClient } from './apiClient.js';
 import type { EdgeConfigCache } from './configCache.js';
@@ -136,8 +136,16 @@ export class ApiPayloadAdapter implements Adapter {
     const context = currentRequestContext();
     const record = await this.#client.findPayload(model, id);
     // The grant loads the code more than once per request, and only the first is the poll.
-    // Only a code that exists is tracked, so made-up ones cannot fill the throttle.
-    if (model === 'DeviceCode' && record && context?.tokenRequest && !context.devicePolled) {
+    // Only a code that exists is tracked, so made-up ones cannot fill the throttle. The
+    // library's own routing says whether this is the token endpoint, for every spelling of
+    // the path it accepts.
+    if (
+      model === 'DeviceCode' &&
+      record &&
+      context &&
+      !context.devicePolled &&
+      Provider.ctx?.oidc?.route === 'token'
+    ) {
       context.devicePolled = true;
       this.#polls.check(id);
     }

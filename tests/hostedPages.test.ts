@@ -230,4 +230,22 @@ describe('the resume cookie', () => {
     expect(stale.status).toBe(400);
     expect(stale.text).toContain('authorization request has expired');
   });
+
+  it('checks the uid on every spelling of the resume path the library routes', async () => {
+    const { base } = await startEdge();
+    const browser = new FakeBrowser(base);
+    const config = await relyingParty(base, firstParty);
+
+    const first = await startAuthorization(config, firstParty);
+    const started = await browser.get(first.url.href);
+    const firstUid = new URL(String(started.headers.location), 'https://x').pathname.split('/')[2];
+    const second = await startAuthorization(config, firstParty);
+    await browser.get(second.url.href);
+
+    for (const path of [`/authorize/${firstUid}/`, `/AUTHORIZE/${firstUid}`]) {
+      const stale = await browser.get(path);
+      expect(stale.status, path).toBe(400);
+      expect(stale.text, path).toContain('authorization request has expired');
+    }
+  });
 });

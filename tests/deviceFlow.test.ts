@@ -277,6 +277,21 @@ describe('device authorization grant', () => {
     expect((await poll(body.device_code)).status).toBe(200);
   });
 
+  it('throttles polls on every spelling of the token path the library routes', async () => {
+    const form = { client_id: tv.client_id, grant_type: DEVICE_CODE_GRANT };
+    for (const path of ['/token/', '/TOKEN']) {
+      const { body } = await authorize();
+      expect((await post(path, { ...form, device_code: body.device_code })).json()).toMatchObject({
+        error: 'authorization_pending',
+      });
+      now += 1000;
+      expect(
+        (await post(path, { ...form, device_code: body.device_code })).json(),
+        path,
+      ).toMatchObject({ error: 'slow_down' });
+    }
+  });
+
   it('tells a client polling sooner than the interval to slow down, and grows it', async () => {
     const { body } = await authorize();
     const form = { client_id: tv.client_id, grant_type: DEVICE_CODE_GRANT };

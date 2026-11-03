@@ -8,13 +8,16 @@ import { useAuth } from '@seamless-auth/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
+import { Confirm } from './Confirm';
 import { Consent } from './Consent';
 import {
   finish,
+  type FinishOptions,
   forgetInteraction,
   getDetails,
   type InteractionDetails,
   type InteractionStep,
+  needsConfirmation,
   pendingInteraction,
   rememberInteraction,
   sameOriginUrl,
@@ -61,10 +64,10 @@ export function InteractionPage({ appName }: { appName: string }) {
   }, [uid]);
 
   const complete = useCallback(
-    async (step: InteractionStep, afterStepUp = false) => {
+    async (step: InteractionStep, options: FinishOptions = {}) => {
       setBusy(true);
       setStepUp(null);
-      const result = await finish(uid, step, afterStepUp);
+      const result = await finish(uid, step, options);
       if (result.ok) {
         const target = sameOriginUrl(result.data.redirectTo);
         if (target) {
@@ -114,7 +117,11 @@ export function InteractionPage({ appName }: { appName: string }) {
       }
       started.current = true;
       void complete('login');
-    } else if (details.prompt.name === 'consent' && details.client.firstParty) {
+    } else if (
+      details.prompt.name === 'consent' &&
+      details.client.firstParty &&
+      !needsConfirmation(details)
+    ) {
       started.current = true;
       void complete('consent');
     }
@@ -128,7 +135,7 @@ export function InteractionPage({ appName }: { appName: string }) {
       <StepUp
         clientName={details.client.name}
         methods={stepUp}
-        onVerified={() => void complete('login', true)}
+        onVerified={() => void complete('login', { afterStepUp: true })}
         onCancel={() => void complete('abort')}
       />
     );
@@ -139,8 +146,18 @@ export function InteractionPage({ appName }: { appName: string }) {
         details={details}
         appName={appName}
         busy={busy}
-        onAllow={() => void complete('consent')}
+        onAllow={() => void complete('consent', { confirmed: true })}
         onDeny={() => void complete('abort')}
+      />
+    );
+  }
+  if (details?.prompt.name === 'consent' && needsConfirmation(details)) {
+    return (
+      <Confirm
+        clientName={details.client.name}
+        busy={busy}
+        onContinue={() => void complete('consent', { confirmed: true })}
+        onCancel={() => void complete('abort')}
       />
     );
   }

@@ -57,7 +57,12 @@ describe('per-application token lifetimes', () => {
       const uid = interactionUid(landed);
       const details = await browser.get(`/interaction/${uid}/details`);
       const name = details.json<{ prompt: { name: string } }>().prompt.name;
-      const done = await browser.post(`/interaction/${uid}/${name}`);
+      // The user confirms the native client's consent prompt (RFC 8252 section 8.6).
+      const done = await browser.post(
+        `/interaction/${uid}/${name}`,
+        { 'content-type': 'application/json' },
+        JSON.stringify(name === 'consent' ? { confirmed: true } : {}),
+      );
       landed = await follow(browser, done.json<{ redirectTo: string }>().redirectTo);
     }
     const tokens = await oidc.authorizationCodeGrant(config, landed, {

@@ -39,6 +39,8 @@ export {
 export {
   ApiSigningKey,
   classifyToken,
+  SIGNING_KEY_REFRESH_MS,
+  SigningKeyRing,
   signingKeysFrom,
   UnsignableTokenError,
 } from './signingKey.js';

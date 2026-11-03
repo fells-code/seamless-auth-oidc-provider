@@ -63,11 +63,20 @@ export function leaveBackchannelLogoutToApi(provider: Provider) {
  * it was made under, which this does. That revocation is what tells every other app the user
  * signed in to through it. The adapter cookies are cleared too, so the hosted pages do not
  * offer a session that no longer exists.
+ *
+ * A provider session with no account gets no confirmation page: the library posts
+ * `logout=yes` on its own, so any site could send a browser there. The first-party session
+ * and its cookies are left alone then, since nobody chose to sign out of anything.
  */
 export function endFirstPartySessionOnLogout(client: OidcApiClient, adapterCookies: string[]) {
   return async (ctx: KoaContextWithOIDC, next: () => Promise<unknown>) => {
     await next();
-    if (ctx.oidc?.route !== 'end_session_confirm' || ctx.status !== 303) {
+    // The library destroys the session it ends, but the loaded copy still names its account.
+    if (
+      ctx.oidc?.route !== 'end_session_confirm' ||
+      ctx.status !== 303 ||
+      !ctx.oidc.session?.accountId
+    ) {
       return;
     }
     const everywhere = Boolean(ctx.oidc.params?.logout);

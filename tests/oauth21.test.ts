@@ -46,7 +46,16 @@ describe('native and desktop clients (RFC 8252)', () => {
     const uid = interactionUid(await follow(browser, flow.url.href));
     signIn(browser);
     const login = await browser.post(`/interaction/${uid}/login`);
-    const callback = await follow(browser, login.json<{ redirectTo: string }>().redirectTo);
+    // A native client's request is confirmed by the user (RFC 8252 section 8.6).
+    const confirmUid = interactionUid(
+      await follow(browser, login.json<{ redirectTo: string }>().redirectTo),
+    );
+    const confirmed = await browser.post(
+      `/interaction/${confirmUid}/consent`,
+      { 'content-type': 'application/json' },
+      JSON.stringify({ confirmed: true }),
+    );
+    const callback = await follow(browser, confirmed.json<{ redirectTo: string }>().redirectTo);
     return { flow, callback };
   }
 

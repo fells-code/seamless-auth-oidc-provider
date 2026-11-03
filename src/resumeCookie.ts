@@ -13,7 +13,9 @@ import type { Middleware } from 'koa';
  * whose uid is not the cookie's (the library would otherwise resume the cookie's).
  */
 export function hostOnlyResumeCookie(cookieName: string, resumePath: string): Middleware {
-  const pattern = new RegExp(`^${escapeRegExp(resumePath)}/([^/]+)$`);
+  // As the library's router matches it: one trailing slash dropped and ASCII case ignored
+  // (the `i` flag without `u` folds no other character into ASCII, as its router does not).
+  const pattern = new RegExp(`^${escapeRegExp(resumePath)}/([^/]+)/?$`, 'i');
   const prefixes = [`${cookieName}=`, `${cookieName}.sig=`];
 
   return async (ctx, next) => {
