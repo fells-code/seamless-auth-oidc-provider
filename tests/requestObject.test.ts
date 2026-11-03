@@ -7,6 +7,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { FakeBrowser } from './browser.js';
+import { ISSUER } from './fakeApi.js';
 import { firstParty, REDIRECT, startEdge } from './harness.js';
 
 const HTML = { accept: 'text/html' };
@@ -66,9 +67,8 @@ describe('a refused request object', () => {
       action: REDIRECT,
       inputs: {
         error: 'request_not_supported',
-        error_description: expect.any(String),
         state: 'outside-state',
-        iss: expect.any(String),
+        iss: ISSUER,
       },
     });
   });
