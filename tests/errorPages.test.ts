@@ -4,8 +4,11 @@
  * See LICENSE file in the project root for full license information
  */
 
+import type { KoaContextWithOIDC } from 'oidc-provider';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { createErrorPage } from '../src/errorPage.js';
+import { type HostedPageData, type HostedPageRenderer, renderIndex } from '../src/hostedPages.js';
 import { FakeBrowser } from './browser.js';
 import { firstParty, REDIRECT, startEdge } from './harness.js';
 
@@ -106,16 +109,61 @@ describe('error pages the provider cannot redirect', () => {
     expect(response.text).not.toContain('<script>alert(1)</script>');
     expect(response.text).not.toContain('<img src=x');
   });
+});
+
+describe('createErrorPage', () => {
+  function capture() {
+    const pages: HostedPageData[] = [];
+    const render: HostedPageRenderer = async (page) => {
+      pages.push(page!);
+      return {
+        html: renderIndex('<!--seamless:head-->', { appName: 'Example' }, 'nonce', undefined, page),
+        headers: { 'content-security-policy': "default-src 'none'" },
+      };
+    };
+    return { pages, render };
+  }
+
+  function fakeContext() {
+    const headers: Record<string, string> = {};
+    const ctx = {
+      type: '',
+      body: '',
+      set: (values: Record<string, string>) => Object.assign(headers, values),
+    };
+    return { ctx, headers };
+  }
 
   it('keeps a server failure generic', async () => {
-    const response = await browser.get(
-      `/session/end?${new URLSearchParams({ client_id: 'nobody' })}`,
-      HTML,
-    );
+    const { pages, render } = capture();
+    const { ctx } = fakeContext();
+    await createErrorPage(render)(ctx as unknown as KoaContextWithOIDC, {
+      error: 'server_error',
+      error_description: 'oops! something went wrong',
+    });
+    expect(pages).toEqual([
+      { view: 'error', error: 'server_error', description: 'Something went wrong on our side.' },
+    ]);
+  });
 
-    expect(response.status).toBeGreaterThanOrEqual(400);
-    const page = pageData(response.text);
-    expect(page?.view).toBe('error');
-    expect(String(page?.description)).not.toMatch(/oops/i);
+  it('passes on only the code and description, escaped for the page', async () => {
+    const { pages, render } = capture();
+    const { ctx, headers } = fakeContext();
+    await createErrorPage(render)(ctx as unknown as KoaContextWithOIDC, {
+      error: 'invalid_request',
+      error_description: '</script><script>alert(1)</script>',
+      state: '<b>state</b>',
+    });
+    expect(pages).toEqual([
+      {
+        view: 'error',
+        error: 'invalid_request',
+        description: '</script><script>alert(1)</script>',
+      },
+    ]);
+    expect(ctx.type).toBe('html');
+    expect(ctx.body).not.toContain('<script>alert(1)');
+    expect(ctx.body).not.toContain('<b>state');
+    expect(headers['content-security-policy']).toBe("default-src 'none'");
   });
 });

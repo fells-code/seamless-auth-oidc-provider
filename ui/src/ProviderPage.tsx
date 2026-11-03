@@ -24,7 +24,8 @@ export type ProviderPageData =
       clientName: string | null;
       scopes: string[];
     }
-  | { view: 'device_done'; clientName: string | null };
+  | { view: 'device_done'; clientName: string | null }
+  | { view: 'error'; error: string; description: string | null };
 
 function text(value: unknown): string | null {
   return typeof value === 'string' && value ? value : null;
@@ -69,6 +70,13 @@ export function readProviderPage(): ProviderPageData | null {
   }
   if (data.view === 'device_done') {
     return { view: 'device_done', clientName };
+  }
+  if (data.view === 'error') {
+    return {
+      view: 'error',
+      error: text(data.error) ?? 'server_error',
+      description: text(data.description),
+    };
   }
   return null;
 }
@@ -224,6 +232,50 @@ function DeviceDone({ page }: { page: Extract<ProviderPageData, { view: 'device_
   );
 }
 
+const ERROR_MESSAGES: Record<string, string> = {
+  invalid_redirect_uri:
+    'The app asked to send you back to an address it has not registered, so we stopped here.',
+  invalid_client: 'We do not recognise the app that sent you here.',
+  invalid_request: 'The app sent a request we could not accept.',
+  unauthorized_client: 'This app is not allowed to sign in this way.',
+  request_not_supported: 'The app sent a request we could not accept.',
+  server_error: 'Something went wrong on our side.',
+};
+
+function ErrorPage({
+  appName,
+  page,
+}: {
+  appName: string;
+  page: Extract<ProviderPageData, { view: 'error' }>;
+}) {
+  const heading = useFocusedHeading();
+  return (
+    <section aria-labelledby="error-title" className="card notice">
+      <h2 id="error-title" ref={heading} tabIndex={-1}>
+        We could not continue
+      </h2>
+      <p>
+        {ERROR_MESSAGES[page.error] ?? 'The app sent a request we could not accept.'} Go back to the
+        app and try again. If it keeps happening, tell the people who run it.
+      </p>
+      <dl className="error-detail">
+        <dt>Error</dt>
+        <dd>
+          <code>{page.error}</code>
+        </dd>
+        {page.description ? (
+          <>
+            <dt>Details</dt>
+            <dd>{page.description}</dd>
+          </>
+        ) : null}
+      </dl>
+      <p className="error-footer">You have not been signed in to or out of {appName}.</p>
+    </section>
+  );
+}
+
 export function ProviderPage({ appName, page }: { appName: string; page: ProviderPageData }) {
   switch (page.view) {
     case 'logout':
@@ -236,5 +288,7 @@ export function ProviderPage({ appName, page }: { appName: string; page: Provide
       return <DeviceConfirm page={page} />;
     case 'device_done':
       return <DeviceDone page={page} />;
+    case 'error':
+      return <ErrorPage appName={appName} page={page} />;
   }
 }
