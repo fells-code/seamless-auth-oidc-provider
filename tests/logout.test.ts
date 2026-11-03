@@ -183,4 +183,28 @@ describe('RP-initiated logout', () => {
     const success = await browser.get(location.href);
     expect(pageData(success.text)).toEqual({ view: 'signed_out', clientName: null });
   });
+
+  it('leaves the first-party session alone when the provider session has no account', async () => {
+    // A browser signed in to the hosted pages that never finished a provider sign-in, sent to
+    // /session/end by any site. The library posts logout=yes on its own when nobody is
+    // signed in to the provider, so no person chose to sign out.
+    const visitor = new FakeBrowser(started.base);
+    signIn(visitor);
+    const response = await visitor.get(
+      `/session/end?${new URLSearchParams({ client_id: loggingOut.client_id })}`,
+    );
+    expect(response.status).toBe(200);
+    const xsrf = /name="xsrf" value="([^"]+)"/.exec(response.text)?.[1];
+    expect(response.text).toMatch(/name="logout" value="yes"/);
+    expect(xsrf).toBeTruthy();
+
+    const done = await visitor.post(
+      '/session/end/confirm',
+      FORM,
+      new URLSearchParams({ xsrf: xsrf!, logout: 'yes' }).toString(),
+    );
+    expect(done.status).toBe(303);
+    expect(visitor.cookies.has(ACCESS_COOKIE)).toBe(true);
+    expect(started.store.revokedSessions).toEqual([]);
+  });
 });
