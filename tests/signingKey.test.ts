@@ -11,8 +11,13 @@ import { describe, expect, it } from 'vitest';
 import { OidcApiClient } from '../src/apiClient.js';
 import { OidcSignRefusedError } from '../src/errors.js';
 import { runWithRequestContext } from '../src/requestContext.js';
-import { classifyToken, signingKeysFrom, UnsignableTokenError } from '../src/signingKey.js';
-import { API_URL, createFakeApi, json, SERVICE_SECRET } from './fakeApi.js';
+import {
+  classifyToken,
+  SigningKeyRing,
+  signingKeysFrom,
+  UnsignableTokenError,
+} from '../src/signingKey.js';
+import { API_URL, createFakeApi, json, rsaKey, SERVICE_SECRET } from './fakeApi.js';
 
 const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
 
@@ -134,6 +139,87 @@ describe('ApiSigningKey.sign', () => {
     await expect(active!.sign(Buffer.from(`${b64([1])}.${b64({})}`))).rejects.toThrow(/malformed/);
     await expect(active!.sign(Buffer.from(`${b64({ alg: 'PS256' })}.${b64({})}`))).rejects.toThrow(
       /does not match/,
+    );
+    expect(api.requests.length).toBe(calls);
+  });
+});
+
+describe('SigningKeyRing', () => {
+  const next = rsaKey('next');
+
+  function rotated(api: ReturnType<typeof createFakeApi>, alg = 'RS256') {
+    api.on(({ path }) =>
+      path === '/oidc/jwks'
+        ? json(200, { activeKid: 'next', keys: [{ ...next.jwk, alg }, api.active.jwk] })
+        : undefined,
+    );
+  }
+
+  it('hands the library fixed slots that follow a reload', async () => {
+    const { api, client } = setup();
+    const ring = new SigningKeyRing(await client.jwks(), client);
+    const [slot, published] = ring.providerKeys;
+    expect([slot?.kid, published?.kid]).toEqual(['active', 'previous']);
+
+    rotated(api);
+    await ring.reload();
+    expect([slot?.kid, published?.kid]).toEqual(['next', 'active']);
+    expect((await slot!.keyObject()).export({ format: 'jwk' }).n).toBe(next.jwk.n);
+    expect(ring.publicJwks.map((key) => key.kid)).toEqual(['next', 'active']);
+    expect(ring.publicJwks[0]).not.toHaveProperty('d');
+  });
+
+  it('reloads once at a time, and keeps its keys when a reload fails', async () => {
+    const { api, client } = setup();
+    const ring = new SigningKeyRing(await client.jwks(), client);
+    const before = api.requests.length;
+    await Promise.all([ring.reload(), ring.reload()]);
+    expect(api.requests.length - before).toBe(1);
+
+    api.on(({ path }) => (path === '/oidc/jwks' ? json(503) : undefined));
+    await expect(ring.reload()).rejects.toThrow();
+    expect(ring.keys[0]?.kid).toBe('active');
+  });
+
+  it('refuses a rotation to another algorithm, which needs a restart', async () => {
+    const { api, client } = setup();
+    const ring = new SigningKeyRing(await client.jwks(), client);
+    rotated(api, 'PS256');
+    await expect(ring.reload()).rejects.toThrow(/restart/);
+    expect(ring.keys[0]?.kid).toBe('active');
+  });
+
+  it('reloads on a timer', async () => {
+    const { api, client } = setup();
+    const ring = new SigningKeyRing(await client.jwks(), client);
+    rotated(api);
+    const stop = ring.startRefresh(5);
+    await expect.poll(() => ring.keys[0]?.kid).toBe('next');
+    stop();
+  });
+
+  it('reloads when the API refuses the key as unknown, and still fails that request', async () => {
+    const { api, client } = setup();
+    const ring = new SigningKeyRing(await client.jwks(), client);
+    rotated(api);
+    api.on(({ path }) => (path === '/oidc/sign' ? json(403, { error: 'unknown_key' }) : undefined));
+    const input = `${b64({ alg: 'RS256', kid: 'active' })}.${b64({ aud: 'app', sub: 'u1' })}`;
+
+    await expect(
+      runWithRequestContext({ correlationId: 'c', sessionId: 's1' }, () =>
+        ring.providerKeys[0]!.sign(Buffer.from(input)),
+      ),
+    ).rejects.toMatchObject({ code: 'unknown_key' });
+    expect(ring.keys[0]?.kid).toBe('next');
+  });
+
+  it('refuses to sign a header that names another key', async () => {
+    const { api, client } = setup();
+    const ring = new SigningKeyRing(await client.jwks(), client);
+    const calls = api.requests.length;
+    const input = `${b64({ alg: 'RS256', kid: 'previous' })}.${b64({ aud: 'app' })}`;
+    await expect(ring.providerKeys[0]!.sign(Buffer.from(input))).rejects.toThrow(
+      /kid previous does not match key active/,
     );
     expect(api.requests.length).toBe(calls);
   });

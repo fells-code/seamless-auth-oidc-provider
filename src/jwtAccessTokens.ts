@@ -26,8 +26,12 @@ function decode(segment: string): Record<string, unknown> | undefined {
  * Maps a JWT access token this provider signed back to its `jti`. Only RS256, the one alg the
  * API signs with, and only after the signature checks out against a published provider key.
  */
-export function createJwtAccessTokenLookup(keys: readonly ApiSigningKey[], issuer: string) {
+export function createJwtAccessTokenLookup(
+  currentKeys: () => readonly ApiSigningKey[],
+  issuer: string,
+) {
   return (value: string): string | undefined => {
+    const keys = currentKeys();
     const [header, payload, signature, extra] = value.split('.');
     if (!header || !payload || !signature || extra !== undefined) {
       return undefined;

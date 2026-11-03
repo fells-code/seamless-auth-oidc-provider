@@ -16,6 +16,10 @@ any OIDC app ──► seamless-auth-oidc-provider (public: OIDC endpoints, host
 - Built on [`oidc-provider`](https://github.com/panva/node-oidc-provider) 9.x.
 - Holds no private keys and no database. The API signs every token after checking its claims,
   and stores all provider state.
+- Follows the API's key rotation without a restart. It re-reads the API's keys every five
+  minutes (`signingKeyRefreshMs` when embedded), and at once when the API refuses a key as
+  unknown, so at most the request that meets a rotation fails. `/jwks` serves the current set.
+  Rotating to a key with another algorithm still needs a restart.
 - Code flow with PKCE (a confidential client can be opted out, and then sends `nonce` unless that is waived too), refresh rotation always on, `private_key_jwt` for confidential
   clients, and shared secrets only for clients opted in on the API.
 
