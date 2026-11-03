@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DEVICE_CODE_GRANT, DevicePollThrottle } from '../src/deviceFlow.js';
 import { FakeBrowser, sendToEdge } from './browser.js';
-import { EDGE_CONFIG, ISSUER } from './fakeApi.js';
+import { EDGE_CONFIG, ISSUER, json } from './fakeApi.js';
 import {
   firstParty,
   follow,
@@ -343,6 +343,54 @@ describe('device authorization grant', () => {
     expect(page.error === 'expired' || page.error === 'not_found').toBe(true);
     // The API answers nothing for an expired record, so the library cannot tell it apart.
     expect((await poll(body.device_code)).json()).toMatchObject({ error: 'invalid_grant' });
+  });
+
+  describe('when the API keeps an expired code readable (seamless-auth-api#542)', () => {
+    beforeEach(() => {
+      started.api.on(({ method, path }) => {
+        const match = /^\/oidc\/payloads\/DeviceCode\/([^/]+)$/.exec(path);
+        const record = match && started.store.records.get(`DeviceCode/${match[1]}`);
+        return method === 'GET' && record
+          ? json(200, {
+              payload: record.payload,
+              sessionId: record.sessionId,
+              expiresAt: new Date(record.expiresAt).toISOString(),
+              consumedAt: record.consumedAt,
+            })
+          : undefined;
+      });
+    });
+
+    it('answers expired_token for a code whose exp has passed', async () => {
+      const { body } = await authorize();
+      now += 601_000;
+
+      const stored = started.store.records.get(`DeviceCode/${body.device_code}`);
+      expect(Number(stored?.payload.exp) * 1000).toBeLessThan(now);
+      expect((await poll(body.device_code)).json()).toMatchObject({ error: 'expired_token' });
+    });
+
+    it('answers expired_token, not slow_down, to a client polling an expired code too fast', async () => {
+      const { body } = await authorize();
+      const form = { client_id: tv.client_id, grant_type: DEVICE_CODE_GRANT };
+      expect(
+        (await post('/token', { ...form, device_code: body.device_code })).json(),
+      ).toMatchObject({ error: 'authorization_pending' });
+      now += 601_000;
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        now += 1000;
+        expect(
+          (await post('/token', { ...form, device_code: body.device_code })).json(),
+        ).toMatchObject({ error: 'expired_token' });
+      }
+    });
+
+    it('still answers invalid_grant for a code the API does not know', async () => {
+      expect((await poll('no-such-device-code')).json()).toMatchObject({
+        error: 'invalid_grant',
+      });
+    });
   });
 
   it('shows an unknown code as not found', async () => {
