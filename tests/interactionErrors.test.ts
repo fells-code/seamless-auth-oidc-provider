@@ -55,3 +55,20 @@ describe('an API failure while finishing login', () => {
     expect(response.text).not.toMatch(/at .*\.(ts|js):\d+/);
   });
 });
+
+describe('the edge error handler', () => {
+  it('keeps a client error from a body parser as JSON', async () => {
+    const started = await startEdge();
+    const browser = new FakeBrowser(started.base);
+    const config = await relyingParty(started.base, firstParty);
+    const flow = await startAuthorization(config, firstParty);
+    const uid = interactionUid(await follow(browser, flow.url.href));
+    const response = await browser.post(
+      `/interaction/${uid}/login`,
+      { 'content-type': 'application/json' },
+      '{not json',
+    );
+    expect(response.status).toBe(400);
+    expect(response.json()).toEqual({ error: 'invalid_request' });
+  });
+});

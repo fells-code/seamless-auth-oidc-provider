@@ -176,64 +176,69 @@ export function createInteractionRouter(options: InteractionRouterOptions): Rout
       // Saved outside a provider request, where the ttl.Grant function cannot see the client.
       Object.assign(grant, { expiresIn: grantLifetime(found) });
       const grantId = await grant.save();
-
-      const context = await client.authContext(session.sessionId, found.clientId);
-      const refusal =
-        !context || !context.active || context.userId !== session.userId
-          ? new InteractionRefusal(401, 'login_required')
-          : context.recovery
-            ? new InteractionRefusal(403, 'enrollment_required')
-            : undefined;
-      if (refusal || !context) {
-        // A grant left behind would bind the session to the client without a sign-in.
-        await grant.destroy();
-        throw refusal ?? new InteractionRefusal(401, 'login_required');
-      }
-
-      const unmet = unmetRequirements(
-        authRequirements(interaction.params),
-        context,
-        interaction.iat,
-      );
-      if (unmet) {
-        await grant.destroy();
-        if (!afterStepUp) {
-          throw new InteractionRefusal(409, 'step_up_required', {
-            methods: stepUpMethods(unmet, context),
-          });
+      // A grant left behind would bind the session to the client without a sign-in, so only
+      // a finished login keeps it, whatever else ends the request.
+      let keepGrant = false;
+      try {
+        const context = await client.authContext(session.sessionId, found.clientId);
+        if (!context || !context.active || context.userId !== session.userId) {
+          throw new InteractionRefusal(401, 'login_required');
         }
-        // A weaker step-up than the request needs (a synced passkey for phrh, say) ends the
-        // request instead of issuing a lower acr.
-        const redirectTo = await provider.interactionResult(
-          req,
-          res,
-          {
-            error: 'unmet_authentication_requirements',
-            error_description: 'the requested authentication could not be obtained',
-          },
-          { mergeWithLastSubmission: false },
-        );
-        res.json({ redirectTo });
-        return;
-      }
+        if (context.recovery) {
+          throw new InteractionRefusal(403, 'enrollment_required');
+        }
 
-      // RFC 8252 section 8.6: anything on the device can claim a native client's redirect,
-      // so its consent prompt must still run and be confirmed by the user, first-party or not.
-      // A device approval is confirmed on the device pages, after the user code is entered.
-      if (found.applicationType === 'native' && !interaction.deviceCode) {
-        await grant.destroy();
+        const unmet = unmetRequirements(
+          authRequirements(interaction.params),
+          context,
+          interaction.iat,
+        );
+        if (unmet) {
+          if (!afterStepUp) {
+            throw new InteractionRefusal(409, 'step_up_required', {
+              methods: stepUpMethods(unmet, context),
+            });
+          }
+          // A weaker step-up than the request needs (a synced passkey for phrh, say) ends the
+          // request instead of issuing a lower acr.
+          const redirectTo = await provider.interactionResult(
+            req,
+            res,
+            {
+              error: 'unmet_authentication_requirements',
+              error_description: 'the requested authentication could not be obtained',
+            },
+            { mergeWithLastSubmission: false },
+          );
+          res.json({ redirectTo });
+          return;
+        }
+
+        // RFC 8252 section 8.6: anything on the device can claim a native client's redirect,
+        // so its consent prompt must still run and be confirmed by the user, first-party or
+        // not. A device approval is confirmed on the device pages, after the user code is
+        // entered.
+        if (found.applicationType === 'native' && !interaction.deviceCode) {
+          const redirectTo = await provider.interactionResult(req, res, {
+            login: loginResult(session.userId, context),
+          });
+          res.json({ redirectTo });
+          return;
+        }
+
         const redirectTo = await provider.interactionResult(req, res, {
           login: loginResult(session.userId, context),
+          consent: { grantId },
         });
+        keepGrant = true;
         res.json({ redirectTo });
-        return;
+      } finally {
+        if (!keepGrant) {
+          await grant.destroy().catch((error: unknown) => {
+            console.error(`[oidc-provider] could not remove an unused grant: ${String(error)}`);
+          });
+        }
       }
-
-      const redirectTo = await provider.interactionResult(req, res, {
-        login: loginResult(session.userId, context),
-        consent: { grantId },
-      });
-      res.json({ redirectTo });
     }),
   );
 

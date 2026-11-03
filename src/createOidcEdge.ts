@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 import { createSeamlessAuthServer } from '@seamless-auth/express';
 import type { OidcEdgeConfigResponse } from '@seamless-auth/types';
-import express, { type Router } from 'express';
+import express, { type NextFunction, type Request, type Response, type Router } from 'express';
 import Provider from 'oidc-provider';
 
 import { OidcApiClient } from './apiClient.js';
@@ -215,6 +215,31 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
   router.post(`${issuerBase}/device`, ...userCodeLimiters);
 
   router.use(issuerUrl.pathname, provider.callback());
+  router.use(jsonErrorHandler);
 
   return { router, provider, issuer: config.issuer, config, client };
+}
+
+/**
+ * Express's own handler answers HTML, with a stack trace whenever `NODE_ENV` is not
+ * production. A client error from a body parser keeps its status; anything else is logged
+ * by name and message only, and answered as a bare `server_error`.
+ */
+function jsonErrorHandler(error: unknown, _req: Request, res: Response, next: NextFunction) {
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
+  const status =
+    typeof error === 'object' && error !== null && 'status' in error
+      ? Number(error.status)
+      : undefined;
+  if (status !== undefined && status >= 400 && status < 500) {
+    res.status(status).json({ error: 'invalid_request' });
+    return;
+  }
+  const name = error instanceof Error ? error.name : 'Error';
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`[oidc-provider] ${name}: ${message}`);
+  res.status(500).json({ error: 'server_error' });
 }
