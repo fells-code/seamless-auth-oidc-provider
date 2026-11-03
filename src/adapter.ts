@@ -58,6 +58,12 @@ export class UnsupportedModelError extends Error {
 // is acting on.
 const CONTEXTUAL_MODELS = new Set<OidcPayloadModel>(['Session', 'Grant']);
 
+/** The library's own test (`BaseToken#isExpired`): `exp` at or before now, in seconds. */
+function isExpired(record: OidcPayloadRecord): boolean {
+  const { exp } = record.payload;
+  return typeof exp === 'number' && exp <= Math.floor(Date.now() / 1000);
+}
+
 function toAdapterPayload(
   model: OidcPayloadModel,
   record: OidcPayloadRecord | undefined,
@@ -136,12 +142,14 @@ export class ApiPayloadAdapter implements Adapter {
     const context = currentRequestContext();
     const record = await this.#client.findPayload(model, id);
     // The grant loads the code more than once per request, and only the first is the poll.
-    // Only a code that exists is tracked, so made-up ones cannot fill the throttle. The
-    // library's own routing says whether this is the token endpoint, for every spelling of
-    // the path it accepts.
+    // Only a live code that exists is tracked, so made-up ones cannot fill the throttle, and
+    // an expired one the API still returns gets the library's expired_token, not slow_down.
+    // The library's own routing says whether this is the token endpoint, for every spelling
+    // of the path it accepts.
     if (
       model === 'DeviceCode' &&
       record &&
+      !isExpired(record) &&
       context &&
       !context.devicePolled &&
       Provider.ctx?.oidc?.route === 'token'
