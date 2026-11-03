@@ -191,6 +191,11 @@ ends:
   adapter cookies. Every other app the user signed in to with it is signed out too.
 - **Only sign out of** the asking app ends that app's grant and keeps the session.
 
+When the browser has no provider sign-in there is nothing to confirm, and the library ends its
+empty provider session without a page. The first-party session and the adapter cookies are
+left alone then, so a site that sends a browser to `/session/end` cannot sign it out of the
+hosted pages.
+
 Back-channel logout (OpenID Back-Channel Logout 1.0) is sent by the API, not by this service.
 The API holds the keys and sees every way a session ends (this logout, admin revoke, sign-out
 everywhere, eviction), so a client with a `backchannelLogoutUri` gets a `logout+jwt` token
