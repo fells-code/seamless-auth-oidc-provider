@@ -277,8 +277,12 @@ function startServer() {
   });
 }
 
-async function openPage(target: Target, colorScheme: 'light' | 'dark'): Promise<Page> {
-  const context = await browser.newContext({ colorScheme, reducedMotion: 'reduce' });
+async function openPage(
+  target: Target,
+  colorScheme: 'light' | 'dark',
+  viewport = { width: 1280, height: 800 },
+): Promise<Page> {
+  const context = await browser.newContext({ colorScheme, reducedMotion: 'reduce', viewport });
   const page = await context.newPage();
   await page.route('https://cdn.acme.example/**', (route) => route.abort());
   // A platform authenticator, so the passkey screens render as they would on a phone or laptop.
@@ -339,6 +343,22 @@ describe.skipIf(!existsSync(join(UI_DIR, 'index.html')))('hosted pages meet WCAG
       }
     });
   }
+
+  // WCAG 1.4.10: at 320 CSS pixels wide nothing scrolls sideways.
+  describe('reflow', () => {
+    for (const target of TARGETS) {
+      it(target.name, async () => {
+        hostedUi = CUSTOM_BRANDING;
+        const page = await openPage(target, 'light', { width: 320, height: 640 });
+        try {
+          const width = (await page.evaluate('document.documentElement.scrollWidth')) as number;
+          expect(width).toBeLessThanOrEqual(320);
+        } finally {
+          await page.context().close();
+        }
+      });
+    }
+  });
 
   // WCAG 2.1.1 and 2.4.7, which axe cannot see: every control is reached with Tab and shows
   // where focus is.

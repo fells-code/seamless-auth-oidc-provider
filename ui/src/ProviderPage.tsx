@@ -152,7 +152,7 @@ function DeviceInput({ page }: { page: Extract<ProviderPageData, { view: 'device
       </h2>
       <p>Enter the code shown on your TV, console or terminal.</p>
       {error ? (
-        <p role="alert" className="error">
+        <p role="alert" className="error" id="user-code-error">
           {error}
         </p>
       ) : null}
@@ -170,6 +170,7 @@ function DeviceInput({ page }: { page: Extract<ProviderPageData, { view: 'device
             spellCheck={false}
             required
             aria-invalid={error ? true : undefined}
+            aria-describedby={error ? 'user-code-error' : undefined}
           />
         </div>
         <div className="actions">

@@ -15,8 +15,12 @@
   --seamless-color-muted: #4a515b;
   --seamless-color-primary: #1f4fd1;
   --seamless-color-on-primary: #ffffff;
-  --seamless-color-border: #c4c9d1;
+  /* 3:1 against both surfaces, since it is also the edge of every text field (1.4.11). */
+  --seamless-color-border: #7a828e;
   --seamless-color-focus: #1f4fd1;
+  --seamless-color-danger: #b42318;
+  --seamless-color-success: #1a7f37;
+  --seamless-color-warning: #8a4b00;
   --seamless-font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --seamless-radius: 10px;
   --seamless-accent: var(--seamless-color-primary);
@@ -26,6 +30,17 @@
   --seamless-surface: var(--seamless-color-surface);
   --seamless-surface-raised: var(--seamless-color-background);
   --seamless-border: var(--seamless-color-border);
+  /*
+   * The bundled screens fall back to their own palette for anything unset, and several of
+   * those fallbacks fail AA on these surfaces, so every name they read is set here.
+   */
+  --seamless-accent-soft: var(--seamless-color-primary);
+  --seamless-accent-hover: var(--seamless-color-primary);
+  --seamless-accent-muted: color-mix(in srgb, var(--seamless-color-primary) 12%, transparent);
+  --seamless-surface-hover: var(--seamless-color-background);
+  --seamless-danger: var(--seamless-color-danger);
+  --seamless-success: var(--seamless-color-success);
+  --seamless-warning: var(--seamless-color-warning);
   color-scheme: light;
 }
 
@@ -38,8 +53,11 @@
     --seamless-color-muted: #b7bec8;
     --seamless-color-primary: #8fb0ff;
     --seamless-color-on-primary: #0b1530;
-    --seamless-color-border: #454c56;
+    --seamless-color-border: #8a93a0;
     --seamless-color-focus: #8fb0ff;
+    --seamless-color-danger: #ffb4ab;
+    --seamless-color-success: #7ee2a8;
+    --seamless-color-warning: #facc15;
     color-scheme: dark;
   }
 }
@@ -133,6 +151,7 @@ h2:focus {
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
   margin-top: 1.5rem;
 }
@@ -176,7 +195,7 @@ button:disabled {
 
 .error {
   color: var(--seamless-color-text);
-  border-left: 4px solid var(--seamless-color-primary);
+  border-left: 4px solid var(--seamless-color-danger);
   padding-left: 0.75rem;
 }
 
