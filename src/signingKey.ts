@@ -14,6 +14,9 @@ import { DEVICE_CODE_GRANT } from './deviceFlow.js';
 import { OidcSignRefusedError } from './errors.js';
 import { currentRequestContext } from './requestContext.js';
 
+// @types/node 26 dropped the global JsonWebKey.
+type PublicJwk = JsonWebKeyInput['key'] & { kid?: string; use?: string; alg?: string };
+
 export class UnsignableTokenError extends Error {
   constructor(reason: string) {
     super(`This service does not sign this token: ${reason}`);
@@ -117,7 +120,7 @@ export class ApiSigningKey extends ExternalSigningKey {
   }
 
   /** Public members only, whatever else the API's JWK carried. */
-  get publicJwk(): JsonWebKey {
+  get publicJwk(): PublicJwk {
     const { kty, ...rest } = this.#keyObject.export({ format: 'jwk' });
     return { kty, use: 'sig', kid: this.#kid, alg: this.#alg, ...rest };
   }
@@ -228,7 +231,7 @@ export class SigningKeyRing {
   }
 
   /** The current keys, active first, for the edge's `/jwks`. */
-  get publicJwks(): JsonWebKey[] {
+  get publicJwks(): PublicJwk[] {
     return this.#keys.map((key) => key.publicJwk);
   }
 
