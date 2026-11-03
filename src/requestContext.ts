@@ -20,8 +20,7 @@ export interface EdgeRequestContext {
   verifiedJwtTokenId?: string;
   /** Set once the request loads a record from a device approval (ADR D10). */
   deviceFlow?: boolean;
-  /** A POST to the token endpoint, where loading a device code is a poll. */
-  tokenRequest?: boolean;
+  /** Set once a token endpoint request has loaded its device code, which is the poll. */
   devicePolled?: boolean;
   /** A grant source another request consumed first, which makes this one a reuse. */
   lostConsume?: { model: SingleUseModel; grantId?: string };

@@ -95,17 +95,9 @@ export class DevicePollThrottle {
   }
 }
 
-/**
- * Marks token endpoint posts, and adds `interval` to the device authorization response. The
- * provider is mounted at the issuer's path, so paths here are relative to it, and the
- * library's router ignores case.
- */
-export function deviceFlowMiddleware(tokenPath = '/token') {
+/** Adds `interval` to the device authorization response. */
+export function deviceFlowMiddleware() {
   return async (ctx: KoaContextWithOIDC, next: () => Promise<unknown>) => {
-    const context = currentRequestContext();
-    if (context && ctx.method === 'POST' && ctx.path.toLowerCase() === tokenPath) {
-      context.tokenRequest = true;
-    }
     await next();
     if (
       ctx.oidc?.route === 'device_authorization' &&
