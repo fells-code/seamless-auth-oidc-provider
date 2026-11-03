@@ -71,8 +71,19 @@ describe('parseEnv', () => {
     });
     expect(parseEnv({ ...valid, TRUST_PROXY: 'true', PORT: '8080' })).toMatchObject({
       PORT: 8080,
-      TRUST_PROXY: true,
+      TRUST_PROXY: 1,
     });
+  });
+
+  it('refuses a TRUST_PROXY that is neither a hop count nor addresses', () => {
+    for (const value of ['yes', '10.0.0.0/33', '10.0.0.1/8/1', 'proxy.example.com', ' , ']) {
+      expect(() => parseEnv({ ...valid, TRUST_PROXY: value }), value).toThrow(/TRUST_PROXY/);
+    }
+    expect(parseEnv({ ...valid, TRUST_PROXY: '0' }).TRUST_PROXY).toBe(false);
+    expect(parseEnv({ ...valid, TRUST_PROXY: 'loopback, fd00::/8' }).TRUST_PROXY).toEqual([
+      'loopback',
+      'fd00::/8',
+    ]);
   });
 
   it('names the invalid fields without echoing values', () => {

@@ -43,16 +43,28 @@ docker run -p 5314:5314 --env-file .env ghcr.io/fells-code/seamless-auth-oidc-pr
 
 ## Configuration
 
-| Variable                      | Required | Description                                                                                                                                                                                            |
-| ----------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `SEAMLESS_API_URL`            | yes      | The private API, as this service reaches it.                                                                                                                                                           |
-| `SEAMLESS_API_ISSUER`         | no       | The API's `ISSUER`, when it differs from `SEAMLESS_API_URL`.                                                                                                                                           |
-| `SEAMLESS_OIDC_SERVICE_TOKEN` | yes      | This service's own service token secret, `SEAMLESS_OIDC_SERVICE_TOKEN` on the API. It must differ from the adapters' `SEAMLESS_SERVICE_TOKEN`, which this service never holds. At least 32 characters. |
-| `SEAMLESS_JWKS_KID`           | no       | The `kid` on the service tokens this service signs.                                                                                                                                                    |
-| `SEAMLESS_COOKIE_SECRET`      | yes      | Signs the first-party session cookies. At least 32 characters.                                                                                                                                         |
-| `OIDC_COOKIE_KEYS`            | yes      | Comma-separated provider cookie keys. The first signs, the rest verify.                                                                                                                                |
-| `TRUST_PROXY`                 | no       | `true` when TLS ends at a proxy in front of this service.                                                                                                                                              |
-| `PORT`                        | no       | Defaults to `5314`.                                                                                                                                                                                    |
+| Variable                      | Required | Description                                                                                                                                                                                                                                                                                              |
+| ----------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SEAMLESS_API_URL`            | yes      | The private API, as this service reaches it.                                                                                                                                                                                                                                                             |
+| `SEAMLESS_API_ISSUER`         | no       | The API's `ISSUER`, when it differs from `SEAMLESS_API_URL`.                                                                                                                                                                                                                                             |
+| `SEAMLESS_OIDC_SERVICE_TOKEN` | yes      | This service's own service token secret, `SEAMLESS_OIDC_SERVICE_TOKEN` on the API. It must differ from the adapters' `SEAMLESS_SERVICE_TOKEN`, which this service never holds. At least 32 characters.                                                                                                   |
+| `SEAMLESS_JWKS_KID`           | no       | The `kid` on the service tokens this service signs.                                                                                                                                                                                                                                                      |
+| `SEAMLESS_COOKIE_SECRET`      | yes      | Signs the first-party session cookies. At least 32 characters.                                                                                                                                                                                                                                           |
+| `OIDC_COOKIE_KEYS`            | yes      | Comma-separated provider cookie keys. The first signs, the rest verify.                                                                                                                                                                                                                                  |
+| `TRUST_PROXY`                 | no       | The proxies in front of this service, as Express's `trust proxy`: the number of hops (`2` for a CDN in front of a load balancer), or a comma-separated list of proxy addresses and subnets (`10.0.0.0/8, 172.16.0.5`). `true` means one hop. Defaults to `false`. See [Behind a proxy](#behind-a-proxy). |
+| `PORT`                        | no       | Defaults to `5314`.                                                                                                                                                                                                                                                                                      |
+
+### Behind a proxy
+
+The client IP this service forwards to the API decides who shares its per-IP rate limits and
+lockouts, and Express reads it from `X-Forwarded-For` through `TRUST_PROXY`. Set it to the
+proxies actually in front of this service: with too few hops every user arrives as the CDN
+node, and with too many the client picks its own address. A list of addresses and subnets
+holds even when the number of hops varies.
+
+Make the container port reachable only through the proxy. A client that can reach it directly
+writes the last `X-Forwarded-For` entry and `X-Forwarded-Proto` and `X-Forwarded-Host`
+itself, and that address goes to the API under this service's token.
 
 The issuer comes from the API (`oidc_issuer`), not from this service's environment. The service
 answers only requests for the issuer's own scheme and host, and refuses to start when the API
