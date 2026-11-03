@@ -4,7 +4,7 @@
  * See LICENSE file in the project root for full license information
  */
 
-import { createPublicKey, type JsonWebKey, type KeyObject } from 'node:crypto';
+import { createPublicKey, type JsonWebKeyInput, type KeyObject } from 'node:crypto';
 
 import type { OidcJwksResponse, OidcPublicJwk, OidcSignKind } from '@seamless-auth/types';
 import { errors, ExternalSigningKey } from 'oidc-provider';
@@ -92,7 +92,7 @@ export class ApiSigningKey extends ExternalSigningKey {
     super();
     this.#kid = jwk.kid;
     this.#alg = jwk.alg;
-    this.#keyObject = createPublicKey({ key: jwk as JsonWebKey, format: 'jwk' });
+    this.#keyObject = createPublicKey({ key: jwk as JsonWebKeyInput['key'], format: 'jwk' });
     this.#client = client;
     this.#active = active;
   }
