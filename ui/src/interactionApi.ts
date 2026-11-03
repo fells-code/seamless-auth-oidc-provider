@@ -75,12 +75,27 @@ export function getDetails(uid: string) {
   return call<InteractionDetails>(`${base(uid)}/details`, 'GET');
 }
 
-export function finish(uid: string, step: InteractionStep, afterStepUp = false) {
+export interface FinishOptions {
+  afterStepUp?: boolean;
+  /** Set only from the user's own click on a consent or confirmation screen. */
+  confirmed?: boolean;
+}
+
+export function finish(uid: string, step: InteractionStep, options: FinishOptions = {}) {
+  const payload = {
+    ...(options.afterStepUp ? { afterStepUp: true } : {}),
+    ...(options.confirmed ? { confirmed: true } : {}),
+  };
   return call<{ redirectTo: string }>(
     `${base(uid)}/${step}`,
     'POST',
-    afterStepUp ? { afterStepUp: true } : undefined,
+    Object.keys(payload).length > 0 ? payload : undefined,
   );
+}
+
+/** RFC 8252 section 8.6: the provider asks the user to confirm every native client request. */
+export function needsConfirmation(details: InteractionDetails): boolean {
+  return details.prompt.reasons.includes('native_client_prompt');
 }
 
 /** Only ever follow a redirect back into this service. The provider takes it from there. */

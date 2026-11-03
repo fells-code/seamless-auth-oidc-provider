@@ -237,6 +237,11 @@ same way any Seamless app does, then finish the OIDC interaction.
   screens. A recovery session goes to enrollment before it can finish a sign-in.
 - **Consent.** First-party clients have consent implied. Third-party clients see the client
   name, the host they are sent back to and the requested scopes, on every authorization.
+- **Native apps.** Any program on a device can listen on a loopback port or claim a private-use
+  scheme, so every request from a native client (`application_type: native`), first-party
+  included, waits for the user to click "Continue to <app>" (RFC 8252 section 8.6). The consent
+  route refuses it with `403 confirmation_required` unless the page sends `{ "confirmed": true }`
+  from that click. Device-flow approvals are confirmed on the device pages instead.
 - **Branding.** The app name comes from the API's config each time a page is served, so a
   config change needs no build and no restart.
 - **Headers.** A strict CSP (`script-src 'self'`, styles from this origin or with the

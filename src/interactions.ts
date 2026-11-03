@@ -217,6 +217,18 @@ export function createInteractionRouter(options: InteractionRouterOptions): Rout
         return;
       }
 
+      // RFC 8252 section 8.6: anything on the device can claim a native client's redirect,
+      // so its consent prompt must still run and be confirmed by the user, first-party or not.
+      // A device approval is confirmed on the device pages, after the user code is entered.
+      if (found.applicationType === 'native' && !interaction.deviceCode) {
+        await grant.destroy();
+        const redirectTo = await provider.interactionResult(req, res, {
+          login: loginResult(session.userId, context),
+        });
+        res.json({ redirectTo });
+        return;
+      }
+
       const redirectTo = await provider.interactionResult(req, res, {
         login: loginResult(session.userId, context),
         consent: { grantId },
@@ -227,11 +239,19 @@ export function createInteractionRouter(options: InteractionRouterOptions): Rout
 
   router.post(
     '/interaction/:uid/consent',
+    express.json({ limit: '1kb' }),
     handle(async (req, res) => {
       const session = firstPartySession(req);
       const interaction = await load(req, res);
       if (interaction.prompt.name !== 'consent') {
         throw new InteractionRefusal(409, 'consent_not_requested');
+      }
+      // The hosted pages consent for a first-party client on their own, which a native
+      // client's prompt must never get: only a click on the confirmation sends `confirmed`.
+      const confirmed =
+        typeof req.body === 'object' && req.body !== null && req.body.confirmed === true;
+      if (interaction.prompt.reasons.includes('native_client_prompt') && !confirmed) {
+        throw new InteractionRefusal(403, 'confirmation_required');
       }
       const accountId = interaction.session?.accountId;
       if (!accountId || accountId !== session.userId) {
