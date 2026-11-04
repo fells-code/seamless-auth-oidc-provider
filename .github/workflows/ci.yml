@@ -100,6 +100,32 @@ jobs:
       - name: Build
         run: npm run build
 
+  a11y:
+    name: Accessibility (axe, WCAG 2.2 AA)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # Builds the hosted pages and runs axe and a keyboard pass over each of them, with the
+      # default and a custom branding, in light and dark. See docs/accessibility-audit.md.
+      - name: Check the hosted pages
+        run: npm run test:a11y
+
   docker:
     name: Build image
     runs-on: ubuntu-latest

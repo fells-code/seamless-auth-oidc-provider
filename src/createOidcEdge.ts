@@ -25,6 +25,7 @@ import { buildProviderConfiguration, PROVIDER_COOKIE_NAMES } from './providerCon
 import { createRateLimiter } from './rateLimit.js';
 import { revokeSessionOnRefreshReuse } from './refreshReuse.js';
 import { runWithRequestContext } from './requestContext.js';
+import { formPostRefusedRequestObjects } from './requestObjectErrors.js';
 import { hostOnlyResumeCookie } from './resumeCookie.js';
 import { SigningKeyRing } from './signingKey.js';
 import { checkApiCompatibility } from './startup.js';
@@ -112,6 +113,7 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
     }),
   );
   leaveBackchannelLogoutToApi(provider);
+  formPostRefusedRequestObjects(provider);
   provider.proxy = options.trustProxy === true;
   provider.use(hostOnlyResumeCookie(PROVIDER_COOKIE_NAMES.resume, '/authorize'));
   provider.use(verifyClientSecrets(client));

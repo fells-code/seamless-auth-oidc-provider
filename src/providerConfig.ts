@@ -25,6 +25,7 @@ import {
 } from './authRequirements.js';
 import type { EdgeConfigCache } from './configCache.js';
 import { createDevicePages, DEVICE_CODE_TTL_SECONDS } from './deviceFlow.js';
+import { createErrorPage } from './errorPage.js';
 import { OidcApiError } from './errors.js';
 import { readFirstPartySession } from './firstPartySession.js';
 import type { HostedPageRenderer } from './hostedPages.js';
@@ -298,6 +299,7 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
   return {
     adapter: createApiAdapterFactory(input.client, input.configCache),
     findAccount: createFindAccount(input.client),
+    renderError: createErrorPage(input.renderPage),
     loadExistingGrant,
     jwks: { keys: input.signingKeys },
     responseTypes: ['code'],

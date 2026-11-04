@@ -425,12 +425,6 @@
   },
   {
     "plan": "formpost",
-    "module": "oidcc-unsigned-request-object-supported-correctly-or-rejected-as-unsupported",
-    "result": "FAILED",
-    "reason": "response_mode=form_post is only inside the refused request object, so the error comes back by GET and the suite checks for POST before it skips. Form Post OP is deferred to v0.22 (oidc-provider#30)."
-  },
-  {
-    "plan": "formpost",
     "module": "oidcc-claims-essential",
     "result": "FAILED",
     "reason": "ADR 0001 D1 requires PKCE for every client. This module sends no code_challenge, so /authorize answers invalid_request.",

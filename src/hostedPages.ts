@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import type { HostedUi } from '@seamless-auth/types';
 import express, { type Router } from 'express';
 
+import { brandingContrastProblems } from './brandingContrast.js';
 import type { EdgeConfigCache } from './configCache.js';
 
 /**
@@ -142,6 +143,21 @@ export function brandingFor(appName: string, hostedUi: HostedUi | undefined): Ho
 /** A page the provider renders itself (logout, device flow), handed to the SPA as data. */
 export type HostedPageData = Record<string, unknown> & { view: string };
 
+/** WCAG 2.4.2: a page the provider renders is titled for what it does, not "Sign in". */
+const PAGE_TITLES: Record<string, (appName: string) => string> = {
+  logout: (app) => `Sign out of ${app}`,
+  signed_out: (app) => `Signed out of ${app}`,
+  device_input: (app) => `Sign in on a device with ${app}`,
+  device_confirm: (app) => `Sign in on a device with ${app}`,
+  device_done: (app) => `Device signed in with ${app}`,
+  error: (app) => `${app}: we could not continue`,
+};
+
+export function pageTitle(appName: string, page?: HostedPageData): string {
+  const title = page ? PAGE_TITLES[page.view] : undefined;
+  return title ? title(appName) : `Sign in to ${appName}`;
+}
+
 export function renderIndex(
   template: string,
   branding: HostedBranding,
@@ -151,7 +167,7 @@ export function renderIndex(
 ): string {
   const head = [
     `<meta name="seamless-csp-nonce" content="${nonce}" />`,
-    `<title>Sign in to ${escapeHtml(branding.appName)}</title>`,
+    `<title>${escapeHtml(pageTitle(branding.appName, page))}</title>`,
     `<script type="application/json" id="seamless-hosted">${inlineJson(branding)}</script>`,
     ...(page
       ? [`<script type="application/json" id="seamless-page">${inlineJson(page)}</script>`]
@@ -191,8 +207,19 @@ export function createHostedPageRenderer(options: HostedPagesOptions): HostedPag
   if (!template.includes(HEAD_PLACEHOLDER)) {
     throw new Error(`${options.uiDir}/index.html has no ${HEAD_PLACEHOLDER} placeholder`);
   }
+  let checkedColors: string | undefined;
   return async (page, formActions) => {
     const config = await options.configCache.get();
+    const colors = JSON.stringify(config.hostedUi?.colors ?? null);
+    if (colors !== checkedColors) {
+      checkedColors = colors;
+      const problems = brandingContrastProblems(config.hostedUi);
+      if (problems.length > 0) {
+        console.warn(
+          `[oidc-provider] hosted_ui colors fall below WCAG 2.2 AA contrast on the hosted pages: ${problems.join('; ')}`,
+        );
+      }
+    }
     const nonce = randomBytes(16).toString('base64');
     const branding = brandingFor(config.appName, config.hostedUi);
     return {

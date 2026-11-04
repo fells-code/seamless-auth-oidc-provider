@@ -15,6 +15,7 @@ import {
   firstParty,
   follow,
   interactionUid,
+  otherFirstParty,
   relyingParty,
   SESSION,
   signIn,
@@ -155,6 +156,52 @@ describe('RP-initiated logout', () => {
       expect.objectContaining({ type: 'end_session', metadata: { scope: 'client' } }),
     );
     expect(browser.cookies.has(ACCESS_COOKIE)).toBe(true);
+  });
+
+  it("ends only the asking app's grant when the user signs out of it alone", async () => {
+    // A second app on the same provider session, whose grant has to survive.
+    const otherConfig = await relyingParty(started.base, otherFirstParty);
+    const other = await follow(
+      browser,
+      (await startAuthorization(otherConfig, otherFirstParty)).url.href,
+    );
+    expect(other.origin).toBe(new URL(otherFirstParty.redirect_uris[0]!).origin);
+
+    const grantOf = (clientId: string) =>
+      [...started.store.records.values()].filter(
+        (record) => record.model === 'Grant' && record.payload.clientId === clientId,
+      );
+    const [ending] = grantOf(loggingOut.client_id);
+    const [staying] = grantOf(otherFirstParty.client_id);
+    expect(ending).toBeDefined();
+    expect(staying).toBeDefined();
+
+    const { page } = await confirmPage({ id_token_hint: idToken });
+    const before = started.api.requests.length;
+    const done = await browser.post(
+      '/session/end/confirm',
+      FORM,
+      new URLSearchParams({ xsrf: String(page.xsrf) }).toString(),
+    );
+
+    expect(done.status).toBe(303);
+    const grantDeletes = started.api.requests
+      .slice(before)
+      .filter((request) => request.method === 'DELETE' && request.path.includes('/Grant/'));
+    expect(grantDeletes.map((request) => request.path)).toEqual([
+      `/oidc/payloads/Grant/${encodeURIComponent(ending!.id)}`,
+    ]);
+    expect(grantOf(loggingOut.client_id)).toEqual([]);
+    expect(grantOf(otherFirstParty.client_id)).toEqual([staying]);
+    expect(started.store.revokedSessions).toEqual([]);
+    expect(browser.cookies.has(ACCESS_COOKIE)).toBe(true);
+
+    // The provider session is kept: the other app signs in again without a prompt.
+    const again = await follow(
+      browser,
+      (await startAuthorization(otherConfig, otherFirstParty)).url.href,
+    );
+    expect(again.origin).toBe(new URL(otherFirstParty.redirect_uris[0]!).origin);
   });
 
   it('refuses a confirmation without the page xsrf value', async () => {
