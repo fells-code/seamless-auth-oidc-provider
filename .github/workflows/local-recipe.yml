@@ -1,0 +1,72 @@
+name: Local development recipe
+
+# Follows local/README.md on a clean machine, so the page stays true: the stack from nothing, the
+# smoke checks, and a passkey sign-in in a browser. It runs the images the recipe pins, so a
+# weekly run catches a published image or an upstream change breaking it.
+on:
+  pull_request:
+    paths:
+      - 'local/**'
+      - '.github/workflows/local-recipe.yml'
+  schedule:
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  recipe:
+    name: Local recipe
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: local/package-lock.json
+
+      - name: Bring the stack up
+        run: local/up.sh
+
+      - name: Smoke checks
+        run: node local/smoke.mjs
+
+      - name: Cache the Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('local/package-lock.json') }}
+
+      - name: Install the browser
+        working-directory: local
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Passkey sign-in
+        run: node local/passkey-sign-in.mjs
+
+      - name: Service logs
+        if: failure()
+        working-directory: local
+        run: docker compose --env-file settings.env logs --no-color --tail 200
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: local-recipe-screenshots
+          path: local/.generated/screenshots/
+          if-no-files-found: ignore
+          retention-days: 7
