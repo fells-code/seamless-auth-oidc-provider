@@ -39,6 +39,13 @@ The design is in
   hosted pages.
 - HTTPS. Provider cookies are `__Host-` cookies, which browsers only accept over TLS.
 
+## Run it on your laptop
+
+[`local/README.md`](local/README.md) goes from nothing to a passkey sign-in on the hosted page and a
+JWT access token for your own API on one page: a compose file with the API, Postgres and this
+service behind local TLS, generated keys, and a seed for the clients and the resource. The
+production checks stay on.
+
 ## Run the image
 
 ```bash

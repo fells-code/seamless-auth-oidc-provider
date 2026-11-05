@@ -1,0 +1,9 @@
+{
+  "name": "seamless-oidc-local",
+  "private": true,
+  "type": "module",
+  "description": "Checks the local development recipe. Only passkey-sign-in.mjs needs the dependency.",
+  "dependencies": {
+    "playwright": "1.64.1"
+  }
+}

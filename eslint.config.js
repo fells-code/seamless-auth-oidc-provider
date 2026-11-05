@@ -38,7 +38,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['conformance/**/*.mjs'],
+    files: ['conformance/**/*.mjs', 'local/**/*.mjs'],
     languageOptions: {
       globals: {
         Buffer: 'readonly',
