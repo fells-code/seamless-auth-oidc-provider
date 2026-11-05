@@ -107,6 +107,7 @@ src/
   rateLimit.ts       per-IP limit on introspection and revocation
 ui/                  the hosted pages: Vite + React on @seamless-auth/react, built to dist/ui
 tests/               vitest, against a fake API in tests/fakeApi.ts
+local/               the local development recipe: compose stack, seed, smoke checks (README.md there)
 ```
 
 **How a provider sign-in is bound to a first-party session.** The hosted pages sign in

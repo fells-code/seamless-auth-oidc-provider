@@ -1,0 +1,13 @@
+# TLS for the edge: provider cookies are __Host- cookies, and passkeys need a secure origin.
+# Caddy's internal CA signs the certificate. It is never added to a trust store from here; up.sh
+# copies its root to .generated/ca.crt, for you to trust as README.md describes.
+{
+	local_certs
+	skip_install_trust
+	admin off
+	auto_https disable_redirects
+}
+
+{$EDGE_SITE} {
+	reverse_proxy edge:5314
+}

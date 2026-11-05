@@ -10,3 +10,5 @@ coverage/
 .vscode/
 .idea/
 conformance/.run/
+local/.generated/
+local/settings.env
