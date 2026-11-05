@@ -131,6 +131,14 @@ const INTERACTIONS: Record<string, unknown> = {
     loginHint: null,
     account: { identifier: '<img src=x id=injected>@example.com' },
   },
+  native_third_party: {
+    uid: 'native_third_party',
+    prompt: NATIVE_PROMPT,
+    client: { ...NATIVE_CLIENT, firstParty: false },
+    scopes: ['openid'],
+    loginHint: null,
+    account: null,
+  },
   native_no_account: {
     uid: 'native_no_account',
     prompt: NATIVE_PROMPT,
@@ -451,6 +459,15 @@ describe.skipIf(!existsSync(join(UI_DIR, 'index.html')))('hosted pages meet WCAG
       } finally {
         await page.context().close();
       }
+    });
+
+    it('leaves a third-party native client on its consent page', async () => {
+      hostedUi = undefined;
+      const page = await openPage(
+        target('/interaction/native_third_party', '#consent-title'),
+        'light',
+      );
+      await page.context().close();
     });
 
     it('sends a signed-out browser to sign in', async () => {

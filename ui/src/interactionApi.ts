@@ -21,6 +21,8 @@ export interface InteractionDetails {
   };
   scopes: string[];
   loginHint: string | null;
+  /** Who the interaction signs in, when this browser is signed in as them. */
+  account: { identifier: string } | null;
 }
 
 export type InteractionStep = 'login' | 'consent' | 'abort';

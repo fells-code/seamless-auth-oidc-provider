@@ -267,9 +267,17 @@ same way any Seamless app does, then finish the OIDC interaction.
   name, the host they are sent back to and the requested scopes, on every authorization.
 - **Native apps.** Any program on a device can listen on a loopback port or claim a private-use
   scheme, so every request from a native client (`application_type: native`), first-party
-  included, waits for the user to click "Continue to <app>" (RFC 8252 section 8.6). The consent
-  route refuses it with `403 confirmation_required` unless the page sends `{ "confirmed": true }`
-  from that click. Device-flow approvals are confirmed on the device pages instead.
+  included, waits for the user to click "Continue to <app>" (RFC 8252 section 8.6). The card names
+  the client and the account, as `account.identifier` (an email or phone number) from
+  `GET /interaction/:uid/details`, and that field is `null` unless this browser is signed in as the
+  interaction's account and the API can describe it. With no account to name, the page offers only
+  Cancel. The consent route refuses a native prompt with `403 confirmation_required` unless the
+  page sends `{ "confirmed": true }` from that click. Device-flow approvals are confirmed on the
+  device pages instead, before sign-in, so those name the client and the user code only.
+- **Custom pages.** `hosted_ui` only brands these pages. If you replace them with your own (the
+  `uiDir` option), your confirmation must do the same: show `account.identifier` beside the client
+  name as text, send `{ "confirmed": true }` only from a real click, and not offer to continue when
+  `account` is `null`. The edge cannot check any of this for you.
 - **Branding.** The app name comes from the API's config each time a page is served, so a
   config change needs no build and no restart.
 - **Headers.** A strict CSP (`script-src 'self'`, styles from this origin or with the
