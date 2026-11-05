@@ -15,7 +15,7 @@ import { authRequirements, stepUpMethods, unmetRequirements } from './authRequir
 import { OidcApiError } from './errors.js';
 import { type FirstPartySession, readFirstPartySession } from './firstPartySession.js';
 import { createSameOriginGuard } from './originGuard.js';
-import { bindSession } from './requestContext.js';
+import { bindSession, currentRequestContext } from './requestContext.js';
 import { grantLifetime } from './tokenLifetimes.js';
 
 export const FIRST_PARTY_CLIENT_PROPERTY = 'urn:seamless:first_party';
@@ -118,6 +118,35 @@ export function createInteractionRouter(options: InteractionRouterOptions): Rout
     }
   }
 
+  /**
+   * What the confirmation shows as the account, or null when the page must not offer to
+   * continue. A browser only gets it while signed in as the account the interaction is for,
+   * which is what the consent route will require of the click.
+   */
+  async function accountIdentifier(req: Request, interaction: Interaction, clientId: string) {
+    const accountId = interaction.session?.accountId;
+    if (!accountId) {
+      return null;
+    }
+    const cookies = req.cookies as Record<string, string | undefined>;
+    const { session } = readFirstPartySession(
+      cookies[options.accessCookieName],
+      options.adapterCookieSecret,
+    );
+    if (session?.userId !== accountId) {
+      return null;
+    }
+    try {
+      // The interaction's session, which holds the grant. A refreshed cookie can name a newer one.
+      const sessionId = currentRequestContext()?.sessionId ?? session.sessionId;
+      const claims = await client.account(accountId, { clientId, sessionId });
+      return claims?.sub === accountId ? claims.email || claims.phone_number || null : null;
+    } catch (error) {
+      console.error(`[oidc-provider] could not read the account to confirm: ${String(error)}`);
+      return null;
+    }
+  }
+
   router.get(
     '/interaction/:uid/details',
     handle(async (req, res) => {
@@ -125,6 +154,7 @@ export function createInteractionRouter(options: InteractionRouterOptions): Rout
       const found = await clientFor(interaction);
       const details = promptDetails(interaction);
       const redirectUri = stringParam(interaction.params, 'redirect_uri');
+      const identifier = await accountIdentifier(req, interaction, found.clientId);
       res.set('cache-control', 'no-store');
       res.json({
         uid: interaction.uid,
@@ -145,6 +175,7 @@ export function createInteractionRouter(options: InteractionRouterOptions): Rout
         },
         scopes: (stringParam(interaction.params, 'scope') ?? '').split(' ').filter(Boolean),
         loginHint: stringParam(interaction.params, 'login_hint') ?? null,
+        account: identifier ? { identifier } : null,
       });
     }),
   );

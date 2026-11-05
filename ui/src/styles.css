@@ -144,6 +144,10 @@ h2:focus {
   padding-left: 1.25rem;
 }
 
+.confirm-account {
+  overflow-wrap: anywhere;
+}
+
 .consent-warning {
   margin-top: 1rem;
   color: var(--seamless-color-muted);

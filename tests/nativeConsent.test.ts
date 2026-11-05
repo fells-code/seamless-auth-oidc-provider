@@ -8,15 +8,20 @@ import type { OidcClientMetadata } from '@seamless-auth/types';
 import * as oidc from 'openid-client';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { FakeBrowser } from './browser.js';
+import { FakeBrowser, firstPartyCookie } from './browser.js';
+import { json } from './fakeApi.js';
 import {
+  ACCESS_COOKIE,
+  ADAPTER_SECRET,
   firstParty,
   follow,
   interactionUid,
   relyingParty,
+  SESSION,
   signIn,
   startAuthorization,
   startEdge,
+  USER,
 } from './harness.js';
 
 const desktop: OidcClientMetadata = {
@@ -112,5 +117,154 @@ describe('first-party native clients (RFC 8252 section 8.6)', () => {
     const login = await browser.post(`/interaction/${uid}/login`);
     const callback = await follow(browser, login.json<{ redirectTo: string }>().redirectTo);
     expect(callback.origin).toBe('https://app.example.com');
+  });
+});
+
+/**
+ * ADR 0003 X8: the confirmation names the client and the account. Someone approving a sign-in
+ * started by a program on their machine has to see which account it would use.
+ */
+describe('the account on a native client confirmation', () => {
+  const ACCOUNT_LOOKUP = `/oidc/accounts/${USER}`;
+  let started: Awaited<ReturnType<typeof startEdge>>;
+  let browser: FakeBrowser;
+  let config: oidc.Configuration;
+
+  beforeEach(async () => {
+    started = await startEdge();
+    started.store.addClient(desktop);
+    browser = new FakeBrowser(started.base);
+    config = await relyingParty(started.base, desktop);
+  });
+
+  async function signedInConfirmation() {
+    signIn(browser);
+    const flow = await startAuthorization(config, desktop, { redirect_uri: LOOPBACK });
+    const uid = interactionUid(await follow(browser, flow.url.href));
+    const login = await browser.post(`/interaction/${uid}/login`);
+    return interactionUid(await follow(browser, login.json<{ redirectTo: string }>().redirectTo));
+  }
+
+  async function accountOn(uid: string, from = browser) {
+    const details = await from.get(`/interaction/${uid}/details`);
+    expect(details.status).toBe(200);
+    return details.json<{ account?: unknown }>().account;
+  }
+
+  it('names the account after a sign-in, uncached', async () => {
+    const uid = await signedInConfirmation();
+    const details = await browser.get(`/interaction/${uid}/details`);
+    expect(details.json()).toMatchObject({
+      prompt: { reasons: expect.arrayContaining(['native_client_prompt']) },
+      account: { identifier: 'ada@example.com' },
+    });
+    expect(details.headers['cache-control']).toBe('no-store');
+  });
+
+  it('names the account on a request that rides the provider session', async () => {
+    signIn(browser);
+    const web = await relyingParty(started.base, firstParty);
+    const first = await startAuthorization(web, firstParty);
+    const firstUid = interactionUid(await follow(browser, first.url.href));
+    const login = await browser.post(`/interaction/${firstUid}/login`);
+    await follow(browser, login.json<{ redirectTo: string }>().redirectTo);
+
+    const flow = await startAuthorization(config, desktop, { redirect_uri: LOOPBACK });
+    const uid = interactionUid(await follow(browser, flow.url.href));
+    expect(await accountOn(uid)).toEqual({ identifier: 'ada@example.com' });
+  });
+
+  it('asks about the session the interaction belongs to, not a newer one in the cookie', async () => {
+    const uid = await signedInConfirmation();
+    browser.cookies.set(
+      ACCESS_COOKIE,
+      firstPartyCookie(ADAPTER_SECRET, {
+        sub: USER,
+        sessionId: '1c7b4d3e-2f50-4b6c-9d8e-0f1a2b3c4d5e',
+      }),
+    );
+    expect(await accountOn(uid)).toEqual({ identifier: 'ada@example.com' });
+    const lookup = started.api.requests.findLast(({ path }) => path === ACCOUNT_LOOKUP);
+    expect(new URLSearchParams(lookup?.search).get('sessionId')).toBe(SESSION);
+  });
+
+  it('falls back to the phone number for an account with no email', async () => {
+    started.store.addAccount({
+      sessionId: SESSION,
+      claims: { sub: USER, phone_number: '+15550100', roles: ['user'], org_id: null },
+    });
+    const uid = await signedInConfirmation();
+    expect(await accountOn(uid)).toEqual({ identifier: '+15550100' });
+  });
+
+  it('tells a browser without the interaction nothing', async () => {
+    const uid = await signedInConfirmation();
+    const other = new FakeBrowser(started.base);
+    signIn(other);
+    const details = await other.get(`/interaction/${uid}/details`);
+    expect(details.status).toBe(404);
+    expect(details.text).not.toContain('ada@example.com');
+  });
+
+  it('does not name an account to a browser without its first-party session', async () => {
+    const uid = await signedInConfirmation();
+    browser.cookies.delete(ACCESS_COOKIE);
+    expect(await accountOn(uid)).toBeNull();
+  });
+
+  it('does not name an account to a browser signed in as someone else', async () => {
+    const uid = await signedInConfirmation();
+    browser.cookies.set(
+      ACCESS_COOKIE,
+      firstPartyCookie(ADAPTER_SECRET, {
+        sub: '2d8c5e4f-3a61-4c7d-8e9f-1a2b3c4d5e6f',
+        sessionId: SESSION,
+      }),
+    );
+    expect(await accountOn(uid)).toBeNull();
+  });
+
+  it('does not name an account to a recovery session', async () => {
+    const uid = await signedInConfirmation();
+    signIn(browser, SESSION, true);
+    expect(await accountOn(uid)).toBeNull();
+  });
+
+  it('answers without an account when the API has none to give', async () => {
+    const uid = await signedInConfirmation();
+    started.api.on(({ path }) => (path === ACCOUNT_LOOKUP ? json(404) : undefined));
+    expect(await accountOn(uid)).toBeNull();
+  });
+
+  it('answers without an account when the API fails', async () => {
+    const uid = await signedInConfirmation();
+    started.api.on(({ path }) => (path === ACCOUNT_LOOKUP ? json(500) : undefined));
+    expect(await accountOn(uid)).toBeNull();
+  });
+
+  it('answers without an account when the API describes someone else', async () => {
+    const uid = await signedInConfirmation();
+    started.api.on(({ path }) =>
+      path === ACCOUNT_LOOKUP
+        ? json(200, { sub: 'someone-else', email: 'eve@example.com', roles: [], org_id: null })
+        : undefined,
+    );
+    expect(await accountOn(uid)).toBeNull();
+  });
+
+  it('answers without an account when the API knows no identifier for it', async () => {
+    const uid = await signedInConfirmation();
+    started.api.on(({ path }) =>
+      path === ACCOUNT_LOOKUP ? json(200, { sub: USER, roles: [], org_id: null }) : undefined,
+    );
+    expect(await accountOn(uid)).toBeNull();
+  });
+
+  it('has no account to name before a sign-in', async () => {
+    signIn(browser);
+    const flow = await startAuthorization(config, desktop, { redirect_uri: LOOPBACK });
+    const uid = interactionUid(await follow(browser, flow.url.href));
+    expect(await accountOn(uid)).toBeNull();
+    expect(started.api.requests.some(({ path }) => path === ACCOUNT_LOOKUP)).toBe(false);
   });
 });

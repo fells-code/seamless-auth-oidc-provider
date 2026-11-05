@@ -84,6 +84,23 @@ const PROVIDER_PAGES: Record<string, HostedPageData> = {
 
 const PROMPT = { reasons: [], missingClaims: [], missingResourceScopes: [] };
 
+const NATIVE_PROMPT = {
+  ...PROMPT,
+  name: 'consent',
+  reasons: ['native_client_prompt'],
+  missingScopes: [],
+};
+const NATIVE_CLIENT = {
+  id: 'native',
+  name: 'Example Desktop',
+  firstParty: true,
+  redirectHost: null,
+};
+
+/** Long enough to overflow a phone's width if the confirmation does not wrap it. */
+const LONG_ACCOUNT =
+  'ada.lovelace.of.the.analytical.engine.notes@mail.babbage-and-lovelace.example';
+
 /** `/interaction/:uid/details` answers, by uid. */
 const INTERACTIONS: Record<string, unknown> = {
   consent: {
@@ -100,15 +117,35 @@ const INTERACTIONS: Record<string, unknown> = {
   },
   native: {
     uid: 'native',
-    prompt: {
-      ...PROMPT,
-      name: 'consent',
-      reasons: ['native_client_prompt'],
-      missingScopes: [],
-    },
-    client: { id: 'native', name: 'Example Desktop', firstParty: true, redirectHost: null },
+    prompt: NATIVE_PROMPT,
+    client: NATIVE_CLIENT,
     scopes: ['openid'],
     loginHint: null,
+    account: { identifier: LONG_ACCOUNT },
+  },
+  native_markup: {
+    uid: 'native_markup',
+    prompt: NATIVE_PROMPT,
+    client: NATIVE_CLIENT,
+    scopes: ['openid'],
+    loginHint: null,
+    account: { identifier: '<img src=x id=injected>@example.com' },
+  },
+  native_third_party: {
+    uid: 'native_third_party',
+    prompt: NATIVE_PROMPT,
+    client: { ...NATIVE_CLIENT, firstParty: false },
+    scopes: ['openid'],
+    loginHint: null,
+    account: null,
+  },
+  native_no_account: {
+    uid: 'native_no_account',
+    prompt: NATIVE_PROMPT,
+    client: NATIVE_CLIENT,
+    scopes: ['openid'],
+    loginHint: null,
+    account: null,
   },
   stepup: {
     uid: 'stepup',
@@ -171,6 +208,12 @@ const TARGETS: Target[] = [
   { name: 'consent (third-party app)', path: '/interaction/consent', ready: '#consent-title' },
   { name: 'native app confirmation', path: '/interaction/native', ready: '#confirm-title' },
   {
+    name: 'native app confirmation, account unknown',
+    path: '/interaction/native_no_account',
+    ready: '#account-unknown-title',
+    signedIn: true,
+  },
+  {
     name: 'step-up',
     path: '/interaction/stepup',
     ready: '#step-up-title',
@@ -219,6 +262,8 @@ let hostedUi: HostedUi | undefined;
 let browser: Browser;
 let base: string;
 let close: () => void;
+/** Lookups of the `native_late` interaction, whose account appears on the second one. */
+let lateLookups = 0;
 
 function startServer() {
   const configCache = {
@@ -236,6 +281,17 @@ function startServer() {
     render(page)
       .then(({ html, headers }) => res.set(headers).type('html').send(html))
       .catch(next);
+  });
+  app.get('/interaction/native_late/details', (_req, res) => {
+    lateLookups += 1;
+    res.json({
+      uid: 'native_late',
+      prompt: NATIVE_PROMPT,
+      client: NATIVE_CLIENT,
+      scopes: ['openid'],
+      loginHint: null,
+      account: lateLookups > 1 ? { identifier: 'ada@example.com' } : null,
+    });
   });
   app.get('/interaction/:uid/details', (req, res) => {
     const details = INTERACTIONS[req.params.uid];
@@ -343,6 +399,87 @@ describe.skipIf(!existsSync(join(UI_DIR, 'index.html')))('hosted pages meet WCAG
       }
     });
   }
+
+  // ADR 0003 X8: never a Continue on a bare client name.
+  describe('the native app confirmation names the account', () => {
+    const CONTINUE = { name: 'Continue to Example Desktop' };
+
+    function target(path: string, ready: string, signedIn = false): Target {
+      return { name: path, path, ready, signedIn };
+    }
+
+    it('shows the account beside the client', async () => {
+      hostedUi = undefined;
+      const page = await openPage(target('/interaction/native', '#confirm-title'), 'light');
+      try {
+        await expect(page.locator('main').innerText()).resolves.toContain(LONG_ACCOUNT);
+        expect(await page.getByRole('button', CONTINUE).count()).toBe(1);
+      } finally {
+        await page.context().close();
+      }
+    });
+
+    it('renders the account as text', async () => {
+      hostedUi = undefined;
+      const page = await openPage(target('/interaction/native_markup', '#confirm-title'), 'light');
+      try {
+        await expect(page.locator('main').innerText()).resolves.toContain(
+          '<img src=x id=injected>@example.com',
+        );
+        expect(await page.locator('#injected').count()).toBe(0);
+      } finally {
+        await page.context().close();
+      }
+    });
+
+    it('offers only Cancel when no account can be named', async () => {
+      hostedUi = undefined;
+      const page = await openPage(
+        target('/interaction/native_no_account', '#account-unknown-title', true),
+        'light',
+      );
+      try {
+        expect(await page.getByRole('button', { name: /continue/i }).count()).toBe(0);
+        expect(await page.getByRole('button', { name: 'Cancel' }).count()).toBe(1);
+      } finally {
+        await page.context().close();
+      }
+    });
+
+    it('asks again once the page has refreshed the session', async () => {
+      hostedUi = undefined;
+      lateLookups = 0;
+      const page = await openPage(
+        target('/interaction/native_late', '#confirm-title', true),
+        'light',
+      );
+      try {
+        await expect(page.locator('main').innerText()).resolves.toContain('ada@example.com');
+        expect(await page.getByRole('button', CONTINUE).count()).toBe(1);
+      } finally {
+        await page.context().close();
+      }
+    });
+
+    it('leaves a third-party native client on its consent page', async () => {
+      hostedUi = undefined;
+      const page = await openPage(
+        target('/interaction/native_third_party', '#consent-title'),
+        'light',
+      );
+      await page.context().close();
+    });
+
+    it('sends a signed-out browser to sign in', async () => {
+      hostedUi = undefined;
+      const page = await openPage(target('/interaction/native_no_account', 'main form'), 'light');
+      try {
+        expect(new URL(page.url()).pathname).toBe('/login');
+      } finally {
+        await page.context().close();
+      }
+    });
+  });
 
   // WCAG 1.4.10: at 320 CSS pixels wide nothing scrolls sideways.
   describe('reflow', () => {

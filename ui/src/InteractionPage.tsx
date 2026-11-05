@@ -8,7 +8,7 @@ import { useAuth } from '@seamless-auth/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { Confirm } from './Confirm';
+import { AccountUnknown, Confirm } from './Confirm';
 import { Consent } from './Consent';
 import {
   finish,
@@ -40,6 +40,7 @@ export function InteractionPage({ appName }: { appName: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [stepUp, setStepUp] = useState<StepUpMethod[] | null>(null);
+  const [accountChecked, setAccountChecked] = useState(false);
   const started = useRef(false);
 
   useEffect(() => {
@@ -127,6 +128,27 @@ export function InteractionPage({ appName }: { appName: string }) {
     }
   }, [details, loading, isAuthenticated, navigate, complete]);
 
+  // The first answer can race the session refresh useAuth starts on load, so a signed-in browser
+  // with no account to show asks once more before the page says it cannot continue.
+  useEffect(() => {
+    if (!details || loading || accountChecked) return;
+    if (details.prompt.name !== 'consent' || !details.client.firstParty) return;
+    if (!needsConfirmation(details) || details.account) return;
+    if (!isAuthenticated) {
+      navigate('/login', { replace: true });
+      return;
+    }
+    let cancelled = false;
+    void getDetails(uid).then((result) => {
+      if (cancelled) return;
+      if (result.ok) setDetails(result.data);
+      setAccountChecked(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [details, loading, isAuthenticated, accountChecked, uid, navigate]);
+
   if (message) {
     return <Notice title="We could not finish signing you in">{message}</Notice>;
   }
@@ -152,14 +174,26 @@ export function InteractionPage({ appName }: { appName: string }) {
     );
   }
   if (details?.prompt.name === 'consent' && needsConfirmation(details)) {
-    return (
-      <Confirm
-        clientName={details.client.name}
-        busy={busy}
-        onContinue={() => void complete('consent', { confirmed: true })}
-        onCancel={() => void complete('abort')}
-      />
-    );
+    if (details.account) {
+      return (
+        <Confirm
+          clientName={details.client.name}
+          account={details.account.identifier}
+          busy={busy}
+          onContinue={() => void complete('consent', { confirmed: true })}
+          onCancel={() => void complete('abort')}
+        />
+      );
+    }
+    if (accountChecked) {
+      return (
+        <AccountUnknown
+          clientName={details.client.name}
+          busy={busy}
+          onCancel={() => void complete('abort')}
+        />
+      );
+    }
   }
   return (
     <p role="status" className="card status">
