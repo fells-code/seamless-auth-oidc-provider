@@ -144,6 +144,33 @@ carry none of the three, and an opaque `/userinfo` token gains nothing.
 - First-party apps have the scopes granted with the sign-in. Third-party apps list them on the
   consent page.
 
+## Roles, permissions and custom claims
+
+Two scopes release the authorization claims a first-party Seamless token carries (API ADR 0004
+and ADR 0005), under the same names:
+
+| Scope           | Claims                                                                                      |
+| --------------- | ------------------------------------------------------------------------------------------- |
+| `permissions`   | `roles`, `permissions`, `org_id`, `org_roles`, `org_permissions` (or `permissions_omitted`) |
+| `custom_claims` | every custom claim the API resolves for the user and this application                       |
+
+They appear in the ID token and `/userinfo`, and in a user's access token for a resource when the
+grant holds the scope (the access token's own `scope` lists only the resource's scopes). The older
+`seamless` scope still releases `roles` and `org_id` alone.
+
+- `org_id` and the `org_*` claims name the session's active organization, while the user is still
+  a member of it.
+- Custom claims come from the user's instance roles, then their roles in the active organization,
+  then the application's own set (`/admin/custom-claims/oidc_client/:clientId`), then the
+  `pre_token` login hook, a later source winning per name. Reserved names are never released.
+- Permission and custom claims share one 1 KiB budget. Over it, the permission claims become
+  `"permissions_omitted": true` first (read `GET /users/me/permissions` then), and custom claims
+  are dropped whole only when they do not fit beside that marker. Nothing is trimmed in part.
+- The API computes every value and signs only what matches its own computation for the session
+  and application, so this service cannot add, raise or forge one. A role change shows on the
+  next token or refresh.
+- Client credentials tokens carry none of them.
+
 ## Token lifetimes
 
 An application's own `accessTokenTtlSeconds`, `idTokenTtlSeconds` and `refreshTokenTtlSeconds`

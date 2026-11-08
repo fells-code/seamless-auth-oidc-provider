@@ -303,7 +303,8 @@ describe('createFindAccount', () => {
     const account = await inSession(() => findAccount(ctx, 'u1'));
     expect(api.requests.at(-1)?.search).toBe('?clientId=app&sessionId=s1');
     expect(account?.accountId).toBe('u1');
-    expect(await account?.claims('id_token', 'openid', {}, [])).toEqual({
+    const released = await account?.claims('id_token', 'openid', {}, []);
+    expect(Object.fromEntries(Object.entries(released ?? {}))).toEqual({
       sub: 'u1',
       email: 'a@example.com',
       email_verified: true,

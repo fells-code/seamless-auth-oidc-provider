@@ -13,7 +13,14 @@ import {
   type KoaContextWithOIDC,
 } from 'oidc-provider';
 
-import { accessTokenAuthContext } from './accessTokenClaims.js';
+import { accessTokenClaims } from './accessTokenClaims.js';
+import {
+  accountClaimsOf,
+  CUSTOM_CLAIMS_SCOPE,
+  PERMISSIONS_SCOPE,
+  PERMISSIONS_SCOPE_CLAIMS,
+  withAccount,
+} from './accountClaims.js';
 import { createApiAdapterFactory } from './adapter.js';
 import type { OidcApiClient } from './apiClient.js';
 import {
@@ -87,11 +94,7 @@ export function createFindAccount(client: OidcApiClient): FindAccount {
     const claims =
       clientId && sessionId ? await client.account(sub, { clientId, sessionId }) : undefined;
     if (claims) {
-      const { org_id, ...rest } = claims;
-      return {
-        accountId: claims.sub,
-        claims: () => ({ ...rest, ...(org_id ? { org_id } : {}) }),
-      };
+      return withAccount({ accountId: claims.sub, claims: () => accountClaimsOf(claims) }, claims);
     }
     // A client this session has not used yet has no grant, so the API will not describe the
     // account. At authorization the library only needs to know the provider session's own
@@ -324,15 +327,25 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
       userinfoSigningAlgValues: signingAlgs,
     },
     acrValues: [...ACR_VALUES],
-    scopes: ['openid', 'offline_access', 'email', 'phone', 'seamless'],
+    scopes: [
+      'openid',
+      'offline_access',
+      'email',
+      'phone',
+      'seamless',
+      PERMISSIONS_SCOPE,
+      CUSTOM_CLAIMS_SCOPE,
+    ],
     // Listing claims replaces the library's defaults. The session claims sit under openid so
     // every ID token carries the assurance the API recorded (ADR D9, D11), asked for or not.
+    // Custom claim names are the adopter's, so releaseAuthorizationClaims adds them.
     claims: {
       sid: null,
       openid: ['sub', 'acr', 'amr', 'auth_time'],
       email: ['email', 'email_verified'],
       phone: ['phone_number', 'phone_number_verified'],
       seamless: ['roles', 'org_id'],
+      [PERMISSIONS_SCOPE]: [...PERMISSIONS_SCOPE_CLAIMS],
     },
     extraClientMetadata: {
       properties: [
@@ -354,7 +367,7 @@ export function buildProviderConfiguration(input: ProviderConfigurationInput): C
       device_authorization: '/device/auth',
     },
     formats: { customizers: { jwt: storeJwtAccessToken } },
-    extraTokenClaims: accessTokenAuthContext,
+    extraTokenClaims: accessTokenClaims,
     ttl: {
       // Functions, so the resource's and the application's own lifetimes apply.
       AccessToken: accessTokenTtl,

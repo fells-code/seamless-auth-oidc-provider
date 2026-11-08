@@ -11,8 +11,6 @@ import {
   SERVICE_TOKEN_ISSUER,
 } from '@seamless-auth/core';
 import {
-  type OidcAccountClaims,
-  OidcAccountClaimsSchema,
   type OidcAccountQuery,
   type OidcAuthContext,
   OidcAuthContextSchema,
@@ -43,6 +41,7 @@ import {
 } from '@seamless-auth/types';
 import type { z } from 'zod';
 
+import { type OidcProviderAccount, OidcProviderAccountSchema } from './accountClaims.js';
 import { OidcApiError, OidcSignRefusedError } from './errors.js';
 import { currentRequestContext } from './requestContext.js';
 
@@ -205,10 +204,10 @@ export class OidcApiClient {
   }
 
   /** Answers only for the user behind a session holding a grant for `clientId`. */
-  account(id: string, binding: OidcAccountQuery): Promise<OidcAccountClaims | undefined> {
+  account(id: string, binding: OidcAccountQuery): Promise<OidcProviderAccount | undefined> {
     const query = new URLSearchParams(binding).toString();
     return this.#request('GET', `${routePath(OidcEdgeRoutes.account, { id })}?${query}`, {
-      schema: OidcAccountClaimsSchema,
+      schema: OidcProviderAccountSchema,
       allowNotFound: true,
     });
   }
