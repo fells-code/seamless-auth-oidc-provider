@@ -6,6 +6,7 @@
 
 import type { OidcAuthContext, OidcEdgeConfigResponse } from '@seamless-auth/types';
 import {
+  type Account,
   type Configuration,
   type ExternalSigningKey,
   type FindAccount,
@@ -19,6 +20,7 @@ import {
   CUSTOM_CLAIMS_SCOPE,
   PERMISSIONS_SCOPE,
   PERMISSIONS_SCOPE_CLAIMS,
+  providerAccountOf,
   withAccount,
 } from './accountClaims.js';
 import { createApiAdapterFactory } from './adapter.js';
@@ -94,7 +96,15 @@ export function createFindAccount(client: OidcApiClient): FindAccount {
     const claims =
       clientId && sessionId ? await client.account(sub, { clientId, sessionId }) : undefined;
     if (claims) {
-      return withAccount({ accountId: claims.sub, claims: () => accountClaimsOf(claims) }, claims);
+      // Read at call time: a claims_mismatch retry replaces the account's claims in place.
+      const account: Account = withAccount(
+        {
+          accountId: claims.sub,
+          claims: () => accountClaimsOf(providerAccountOf(account) ?? claims),
+        },
+        claims,
+      );
+      return account;
     }
     // A client this session has not used yet has no grant, so the API will not describe the
     // account. At authorization the library only needs to know the provider session's own

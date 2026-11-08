@@ -9,6 +9,7 @@ import * as oidc from 'openid-client';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { FakeBrowser } from './browser.js';
+import { json } from './fakeApi.js';
 import type { FakeAccount } from './fakeStore.js';
 import {
   firstParty,
@@ -217,8 +218,8 @@ describe('roles, permissions and custom claims (#47)', () => {
     }
   });
 
-  it('fails the token request when the API will not sign what the edge asked for', async () => {
-    const flow = await startAuthorization(app, refreshing, { scope: 'openid permissions' });
+  async function authorized(extra: Record<string, string>) {
+    const flow = await startAuthorization(app, refreshing, extra);
     let landed = await follow(browser, flow.url.href);
     signIn(browser);
     for (let step = 0; step < 3 && landed.pathname.startsWith('/interaction/'); step += 1) {
@@ -228,22 +229,149 @@ describe('roles, permissions and custom claims (#47)', () => {
       const done = await browser.post(`/interaction/${uid}/${name}`);
       landed = await follow(browser, done.json<{ redirectTo: string }>().redirectTo);
     }
-    // The account read at the token endpoint and the values the API signs disagree.
-    started.api.on(({ path }) =>
-      path === '/oidc/sign'
-        ? new Response(JSON.stringify({ error: 'subject_mismatch' }), {
-            status: 403,
-            headers: { 'content-type': 'application/json' },
-          })
-        : undefined,
-    );
+    return {
+      redeem: () =>
+        oidc.authorizationCodeGrant(app, landed, {
+          pkceCodeVerifier: flow.codeVerifier,
+          expectedState: flow.state,
+          expectedNonce: flow.nonce,
+        }),
+    };
+  }
 
-    await expect(
-      oidc.authorizationCodeGrant(app, landed, {
-        pkceCodeVerifier: flow.codeVerifier,
-        expectedState: flow.state,
-        expectedNonce: flow.nonce,
-      }),
-    ).rejects.toThrow();
+  /** The account changes right after the edge reads it, before the API signs. */
+  function changeAfterNextRead(changed: FakeAccount['claims']) {
+    let armed = true;
+    started.api.on((request) => {
+      if (!armed || request.path !== `/oidc/accounts/${USER}`) {
+        return undefined;
+      }
+      armed = false;
+      const response = started.store.handle(request);
+      setAccount(changed);
+      return response;
+    });
+  }
+
+  /** openid-client answers a 5xx with the raw response as the cause. */
+  async function tokenError(pending: Promise<unknown>) {
+    const error = await pending.then(
+      () => undefined,
+      (caught: unknown) => caught,
+    );
+    const response = (error as { cause?: Response } | undefined)?.cause;
+    if (!(response instanceof Response)) {
+      throw new Error('expected the token request to fail with a response');
+    }
+    return { status: response.status, body: (await response.json()) as Record<string, unknown> };
+  }
+
+  function refusals() {
+    return started.api.requests.filter((request) => request.path === '/oidc/sign').length;
+  }
+
+  function accountReads() {
+    return started.api.requests.filter((request) => request.path === `/oidc/accounts/${USER}`)
+      .length;
+  }
+
+  const PROMOTED: FakeAccount['claims'] = {
+    ...MEMBER,
+    org_roles: ['owner'],
+    org_permissions: ['projects:read', 'projects:write'],
+    customClaims: { tier: 'platinum' },
+  };
+
+  it('reads the account again and signs once more when a role changed since the read', async () => {
+    const { redeem } = await authorized({ scope: 'openid permissions custom_claims' });
+    changeAfterNextRead(PROMOTED);
+    const readsBefore = accountReads();
+    const signsBefore = refusals();
+
+    const tokens = await redeem();
+
+    expect(tokens.claims()).toMatchObject({
+      org_roles: ['owner'],
+      org_permissions: ['projects:read', 'projects:write'],
+      tier: 'platinum',
+    });
+    expect(tokens.claims()).not.toHaveProperty('limits');
+    // One read for the token request, one after the refusal; one refused sign, one signed.
+    expect(accountReads() - readsBefore).toBe(2);
+    expect(refusals() - signsBefore).toBe(2);
+  });
+
+  it('does the same for an access token for a resource', async () => {
+    const { redeem } = await authorized({
+      resource: ORDERS,
+      scope: 'openid permissions custom_claims orders:read',
+    });
+    changeAfterNextRead(PROMOTED);
+
+    const tokens = await redeem();
+
+    expect(payloadOf(tokens.access_token)).toMatchObject({
+      aud: ORDERS,
+      org_roles: ['owner'],
+      tier: 'platinum',
+    });
+    expect(payloadOf(tokens.access_token)).not.toHaveProperty('limits');
+    expect(tokens.claims()).toMatchObject({ org_roles: ['owner'], tier: 'platinum' });
+  });
+
+  it('fails with server_error when the claims still do not match after one retry', async () => {
+    const { redeem } = await authorized({ scope: 'openid permissions' });
+    started.api.on(({ path }) =>
+      path === '/oidc/sign' ? json(403, { error: 'claims_mismatch' }) : undefined,
+    );
+    const signsBefore = refusals();
+
+    expect(await tokenError(redeem())).toEqual({
+      status: 500,
+      body: {
+        error: 'server_error',
+        error_description: 'the account changed while the token was being issued, try again',
+      },
+    });
+    expect(refusals() - signsBefore).toBe(2);
+  });
+
+  it('fails with server_error when the API no longer describes the account', async () => {
+    const { redeem } = await authorized({ scope: 'openid permissions' });
+    let reads = 0;
+    started.api.on((request) => {
+      if (request.path === '/oidc/sign') {
+        return json(403, { error: 'claims_mismatch' });
+      }
+      if (request.path === `/oidc/accounts/${USER}` && (reads += 1) > 1) {
+        return json(404, { error: 'Not Found' });
+      }
+      return undefined;
+    });
+
+    expect(await tokenError(redeem())).toMatchObject({
+      status: 500,
+      body: {
+        error: 'server_error',
+        error_description: expect.stringContaining('account changed'),
+      },
+    });
+  });
+
+  it('retries no other refusal', async () => {
+    const { redeem } = await authorized({ scope: 'openid permissions' });
+    started.api.on(({ path }) =>
+      path === '/oidc/sign' ? json(403, { error: 'subject_mismatch' }) : undefined,
+    );
+    const readsBefore = accountReads();
+    const signsBefore = refusals();
+
+    // The library's own answer for an unexpected failure, unchanged.
+    expect(await tokenError(redeem())).toEqual({
+      status: 500,
+      body: { error: 'server_error', error_description: 'oops! something went wrong' },
+    });
+    expect(refusals() - signsBefore).toBe(1);
+    expect(accountReads() - readsBefore).toBe(1);
   });
 });

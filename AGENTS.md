@@ -100,6 +100,7 @@ src/
   accessTokenClaims.ts  acr, amr, auth_time and authorization claims on a user's JWT access token
   accountClaims.ts   the API's account claims, the permissions and custom_claims scopes, and
                      custom claims in ID tokens and userinfo (#47)
+  claimsMismatch.ts  reads the account again and retries a sign the API refused as claims_mismatch
   refreshReuse.ts    ends the first-party session when a rotated refresh token is reused
   jwtAccessTokens.ts stores JWT access tokens by jti so introspection and revocation see them
   tokenAudit.ts      records revocations in the API's audit log

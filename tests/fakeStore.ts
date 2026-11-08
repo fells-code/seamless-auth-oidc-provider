@@ -5,6 +5,7 @@
  */
 
 import {
+  CUSTOM_CLAIM_NAME_PATTERN,
   isReservedClaimName,
   type OidcAuthContext,
   type OidcClientMetadata,
@@ -92,9 +93,9 @@ export function createFakeStore() {
   const accounts = new Map<string, FakeAccount & { addedAt: number }>();
 
   /**
-   * As `/oidc/sign` checks account claims (seamless-auth-oidc-provider#47): every one must have
-   * the account's own value, a custom name the account does not have is refused, and the
-   * permission and custom claim sets are carried whole or not at all.
+   * As `/oidc/sign` checks account claims (#47): a reserved or unlisted name is malformed, and a
+   * value other than the account's own, a custom name the account does not have, or part of the
+   * permission or custom claim set is `claims_mismatch`.
    */
   function accountClaimRefusal(
     kind: string,
@@ -115,13 +116,20 @@ export function createFakeStore() {
       Object.entries(stored).filter(([name]) => !isReservedClaimName(name)),
     );
     const expected: Record<string, unknown> = { ...customClaims, ...standard };
-    if (released.some((claim) => !(claim in expected) && !ACCOUNT_CLAIMS.has(claim))) {
+    const unlisted = (claim: string) =>
+      !ACCOUNT_CLAIMS.has(claim) &&
+      (isReservedClaimName(claim) || !CUSTOM_CLAIM_NAME_PATTERN.test(claim));
+    if (released.some(unlisted)) {
       return 'malformed_signing_input';
     }
     if (
-      released.some((claim) => JSON.stringify(claims[claim]) !== JSON.stringify(expected[claim]))
+      released.some(
+        (claim) =>
+          (!(claim in expected) && !ACCOUNT_CLAIMS.has(claim)) ||
+          JSON.stringify(claims[claim]) !== JSON.stringify(expected[claim]),
+      )
     ) {
-      return 'subject_mismatch';
+      return 'claims_mismatch';
     }
     for (const set of [
       PERMISSION_CLAIMS.filter((claim) => claim in standard),
@@ -129,7 +137,7 @@ export function createFakeStore() {
     ]) {
       const carried = set.filter((claim) => claim in claims).length;
       if (carried > 0 && carried < set.length) {
-        return 'subject_mismatch';
+        return 'claims_mismatch';
       }
     }
     return undefined;

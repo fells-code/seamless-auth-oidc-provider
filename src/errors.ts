@@ -17,9 +17,17 @@ export class OidcApiError extends Error {
   }
 }
 
+/**
+ * `claims_mismatch` is newer than the shared refusal codes: the account claims in a signing input
+ * are not what the API computes now, because a role or membership changed since the account was
+ * read.
+ */
+export const CLAIMS_MISMATCH = 'claims_mismatch';
+export type SignRefusalCode = OidcSignRefusalCode | typeof CLAIMS_MISMATCH;
+
 export class OidcSignRefusedError extends Error {
   constructor(
-    readonly code: OidcSignRefusalCode,
+    readonly code: SignRefusalCode,
     message = `Seamless Auth API refused to sign: ${code}`,
   ) {
     super(message);

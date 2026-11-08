@@ -168,7 +168,9 @@ grant holds the scope (the access token's own `scope` lists only the resource's 
   are dropped whole only when they do not fit beside that marker. Nothing is trimmed in part.
 - The API computes every value and signs only what matches its own computation for the session
   and application, so this service cannot add, raise or forge one. A role change shows on the
-  next token or refresh.
+  next token or refresh. If it lands between this service's read and the API's sign, the API
+  refuses with `claims_mismatch` and this service reads the account again and signs once more; a
+  second mismatch answers `server_error`.
 - Client credentials tokens carry none of them.
 
 ## Token lifetimes
