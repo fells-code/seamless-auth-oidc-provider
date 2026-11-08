@@ -33,17 +33,16 @@ import {
   OidcPayloadUpsertResponseSchema,
   type OidcSessionBindRequest,
   type OidcSessionRevokeRequest,
-  OidcSignRefusalCodeSchema,
   OidcSignRefusalSchema,
   type OidcSignRequest,
   type OidcSignResponse,
   OidcSignResponseSchema,
   OidcVerifySecretResponseSchema,
 } from '@seamless-auth/types';
-import { z } from 'zod';
+import type { z } from 'zod';
 
 import { type OidcProviderAccount, OidcProviderAccountSchema } from './accountClaims.js';
-import { CLAIMS_MISMATCH, OidcApiError, OidcSignRefusedError } from './errors.js';
+import { OidcApiError, OidcSignRefusedError } from './errors.js';
 import { currentRequestContext } from './requestContext.js';
 
 export const SERVICE_TOKEN_SUBJECT = 'seamless-oidc-provider';
@@ -51,10 +50,6 @@ export const SERVICE_TOKEN_SUBJECT = 'seamless-oidc-provider';
 // createServiceToken mints a 60 second token. Reusing it for less than that means a
 // request never presents a token that expires in flight.
 const SERVICE_TOKEN_REUSE_MS = 45_000;
-
-const SignRefusalSchema = OidcSignRefusalSchema.extend({
-  error: z.union([OidcSignRefusalCodeSchema, z.literal(CLAIMS_MISMATCH)]),
-});
 
 export interface OidcApiClientOptions {
   apiUrl: string;
@@ -166,7 +161,7 @@ export class OidcApiClient {
     const response = await this.#send('POST', OidcEdgeRoutes.sign, body);
     const json = await readJson(response);
     if (!response.ok) {
-      const refusal = SignRefusalSchema.safeParse(json);
+      const refusal = OidcSignRefusalSchema.safeParse(json);
       if (refusal.success) {
         throw new OidcSignRefusedError(refusal.data.error, refusal.data.message);
       }

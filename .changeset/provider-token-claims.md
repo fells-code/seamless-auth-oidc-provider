@@ -9,4 +9,4 @@ Carry roles, permissions and custom claims in provider tokens (#47).
 - When the API refuses a sign with `claims_mismatch` (a role or membership changed between the account read and the sign), the edge reads the account again and signs once more, so the token request succeeds with the new values. A second mismatch answers `server_error` (500) with a description. Other refusals are not retried.
 - `org_id` now names the session's active organization rather than the user's oldest membership. This changes `org_id` under the `seamless` scope too.
 - Needs a seamless-auth-api release that returns these claims and signs them. Against an older API none are released.
-- Depend on `@seamless-auth/types` `^0.39.0` for the shared reserved claim list.
+- Depend on `@seamless-auth/types` `^0.40.0` for the shared reserved claim list, the account claims schema and the `claims_mismatch` refusal code.

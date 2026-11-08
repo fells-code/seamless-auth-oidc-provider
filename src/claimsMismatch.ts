@@ -8,11 +8,11 @@ import { errors, type KoaContextWithOIDC, Provider } from 'oidc-provider';
 
 import { accountClaimsOf, providerAccountOf, withAccount } from './accountClaims.js';
 import type { OidcApiClient } from './apiClient.js';
-import { CLAIMS_MISMATCH, OidcSignRefusedError } from './errors.js';
+import { OidcSignRefusedError } from './errors.js';
 import { currentRequestContext } from './requestContext.js';
 
 function isClaimsMismatch(error: unknown) {
-  return error instanceof OidcSignRefusedError && error.code === CLAIMS_MISMATCH;
+  return error instanceof OidcSignRefusedError && error.code === 'claims_mismatch';
 }
 
 /** RFC 6749 section 5.2, with the 500 the library answers `server_error` with. */

@@ -4,25 +4,21 @@
  * See LICENSE file in the project root for full license information
  */
 
-import { isReservedClaimName, OidcAccountClaimsSchema } from '@seamless-auth/types';
+import {
+  isReservedClaimName,
+  type OidcAccountClaims,
+  OidcAccountClaimsSchema,
+} from '@seamless-auth/types';
 import type { Account, Provider } from 'oidc-provider';
-import { z } from 'zod';
 
 /**
  * What `/oidc/accounts/:id` returns since seamless-auth-oidc-provider#47: the ADR 0004
  * permission claims under their token names, and the merged custom claims, all computed by the
- * API for this session and client and already held to the shared budget. The shared schema does
- * not have these yet.
+ * API for this session and client and already held to the shared budget.
  */
-export const OidcProviderAccountSchema = OidcAccountClaimsSchema.extend({
-  permissions: z.array(z.string()).optional(),
-  permissions_omitted: z.literal(true).optional(),
-  org_roles: z.array(z.string()).optional(),
-  org_permissions: z.array(z.string()).optional(),
-  customClaims: z.record(z.string(), z.unknown()).default({}),
-});
+export const OidcProviderAccountSchema = OidcAccountClaimsSchema;
 
-export type OidcProviderAccount = z.infer<typeof OidcProviderAccountSchema>;
+export type OidcProviderAccount = OidcAccountClaims;
 
 /** Roles, permissions and the active organization's roles, as a first-party token has them. */
 export const PERMISSIONS_SCOPE = 'permissions';
