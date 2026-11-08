@@ -9,6 +9,8 @@ const DESCRIPTIONS: Record<string, string> = {
   email: 'See your email address',
   phone: 'See your phone number',
   seamless: 'See your roles and organization',
+  permissions: 'See your roles, permissions and organization roles',
+  custom_claims: 'See the extra account details your administrator set for it',
   offline_access: 'Stay signed in when you are not using it',
 };
 

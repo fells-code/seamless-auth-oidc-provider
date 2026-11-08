@@ -12,7 +12,9 @@ import type { OidcEdgeConfigResponse } from '@seamless-auth/types';
 import express, { type NextFunction, type Request, type Response, type Router } from 'express';
 import Provider from 'oidc-provider';
 
+import { releaseAuthorizationClaims } from './accountClaims.js';
 import { OidcApiClient } from './apiClient.js';
+import { retryOnClaimsMismatch } from './claimsMismatch.js';
 import { verifyClientSecrets } from './clientSecrets.js';
 import { EdgeConfigCache } from './configCache.js';
 import { deviceFlowMiddleware } from './deviceFlow.js';
@@ -113,6 +115,8 @@ export async function createOidcEdge(options: OidcEdgeOptions): Promise<OidcEdge
     }),
   );
   leaveBackchannelLogoutToApi(provider);
+  releaseAuthorizationClaims(provider);
+  retryOnClaimsMismatch(provider, client);
   formPostRefusedRequestObjects(provider);
   provider.proxy = options.trustProxy === true;
   provider.use(hostOnlyResumeCookie(PROVIDER_COOKIE_NAMES.resume, '/authorize'));

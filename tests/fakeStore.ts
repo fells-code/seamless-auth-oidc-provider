@@ -4,14 +4,18 @@
  * See LICENSE file in the project root for full license information
  */
 
-import type {
-  OidcAccountClaims,
-  OidcAuthContext,
-  OidcClientMetadata,
-  OidcClientResource,
-  OidcPayloadUpsertRequest,
+import {
+  CUSTOM_CLAIM_NAME_PATTERN,
+  isReservedClaimName,
+  type OidcAuthContext,
+  type OidcClientMetadata,
+  type OidcClientResource,
+  type OidcPayloadUpsertRequest,
 } from '@seamless-auth/types';
+import type { z } from 'zod';
 
+import type { OidcProviderAccountSchema } from '../src/accountClaims.js';
+import { PERMISSION_CLAIMS } from '../src/accountClaims.js';
 import { json, type RecordedRequest } from './fakeApi.js';
 
 const DEVICE_CODE_GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
@@ -26,7 +30,7 @@ interface StoredRecord {
 }
 
 export interface FakeAccount {
-  claims: OidcAccountClaims;
+  claims: z.input<typeof OidcProviderAccountSchema>;
   sessionId: string;
   context?: Partial<OidcAuthContext>;
 }
@@ -51,10 +55,93 @@ function decodeAccessToken(token: string): Record<string, unknown> | undefined {
   }
 }
 
+const PROTOCOL_CLAIMS = new Set([
+  'iss',
+  'sub',
+  'aud',
+  'exp',
+  'iat',
+  'nbf',
+  'jti',
+  'auth_time',
+  'acr',
+  'amr',
+  'sid',
+  'azp',
+  'nonce',
+  'at_hash',
+  'c_hash',
+  's_hash',
+  'client_id',
+  'scope',
+  'cnf',
+]);
+
+const ACCOUNT_CLAIMS = new Set<string>([
+  'email',
+  'email_verified',
+  'phone_number',
+  'phone_number_verified',
+  'roles',
+  'org_id',
+  ...PERMISSION_CLAIMS,
+]);
+
 export function createFakeStore() {
   const records = new Map<string, StoredRecord>();
   const clients = new Map<string, OidcClientMetadata>();
   const accounts = new Map<string, FakeAccount & { addedAt: number }>();
+
+  /**
+   * As `/oidc/sign` checks account claims (#47): a reserved or unlisted name is malformed, and a
+   * value other than the account's own, a custom name the account does not have, or part of the
+   * permission or custom claim set is `claims_mismatch`.
+   */
+  function accountClaimRefusal(
+    kind: string,
+    sessionId: string | undefined,
+    claims: Record<string, unknown>,
+  ): string | undefined {
+    const released = Object.keys(claims).filter((claim) => !PROTOCOL_CLAIMS.has(claim));
+    if (released.length === 0) {
+      return undefined;
+    }
+    const account = [...accounts.values()].find((a) => a.sessionId === sessionId);
+    if (kind === 'client_credentials' || !account) {
+      return 'malformed_signing_input';
+    }
+    const { customClaims: stored = {}, ...standard } = account.claims;
+    // The API never resolves a reserved name into custom claims.
+    const customClaims = Object.fromEntries(
+      Object.entries(stored).filter(([name]) => !isReservedClaimName(name)),
+    );
+    const expected: Record<string, unknown> = { ...customClaims, ...standard };
+    const unlisted = (claim: string) =>
+      !ACCOUNT_CLAIMS.has(claim) &&
+      (isReservedClaimName(claim) || !CUSTOM_CLAIM_NAME_PATTERN.test(claim));
+    if (released.some(unlisted)) {
+      return 'malformed_signing_input';
+    }
+    if (
+      released.some(
+        (claim) =>
+          (!(claim in expected) && !ACCOUNT_CLAIMS.has(claim)) ||
+          JSON.stringify(claims[claim]) !== JSON.stringify(expected[claim]),
+      )
+    ) {
+      return 'claims_mismatch';
+    }
+    for (const set of [
+      PERMISSION_CLAIMS.filter((claim) => claim in standard),
+      Object.keys(customClaims),
+    ]) {
+      const carried = set.filter((claim) => claim in claims).length;
+      if (carried > 0 && carried < set.length) {
+        return 'claims_mismatch';
+      }
+    }
+    return undefined;
+  }
   const secrets = new Map<string, string>();
   const resources = new Map<string, OidcClientResource[]>();
   const revokedSessions: { sessionId: string; reason: string }[] = [];
@@ -289,6 +376,10 @@ export function createFakeStore() {
         ) {
           return json(403, { error: 'auth_context_mismatch' });
         }
+      }
+      const refusal = accountClaimRefusal(request.kind, request.sessionId, claims);
+      if (refusal) {
+        return json(403, { error: refusal });
       }
       signed.push({
         kind: request.kind,
