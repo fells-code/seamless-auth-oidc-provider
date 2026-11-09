@@ -120,6 +120,11 @@ export function createFindAccount(client: OidcApiClient): FindAccount {
  * First-party clients have consent implied, so their grant is created or topped up with what
  * they ask for. Third-party clients (ADR D10) see the consent page on every authorization: only the
  * grant the interaction just produced counts, never one remembered on the provider session.
+ *
+ * A native client's authorizations each get a grant of their own. Revoking a refresh token ends
+ * its whole grant (RFC 7009 section 2.1), and a native app revokes the token a new sign-in or
+ * step-up replaced, so a shared grant would end the new sign-in too. A remembered grant that has
+ * since ended is replaced, since the confirmation page needs a live one to name the account.
  */
 export async function loadExistingGrant(ctx: KoaContextWithOIDC) {
   const { oidc } = ctx;
@@ -128,19 +133,19 @@ export async function loadExistingGrant(ctx: KoaContextWithOIDC) {
     return undefined;
   }
   const firstParty = client[FIRST_PARTY_CLIENT_PROPERTY] === true;
+  const remembersGrant = firstParty && client.applicationType !== 'native';
   const grantId =
     oidc.result?.consent?.grantId ??
-    (firstParty ? oidc.session?.grantIdFor(client.clientId) : undefined);
+    (remembersGrant ? oidc.session?.grantIdFor(client.clientId) : undefined);
+  const existing = grantId ? await oidc.provider.Grant.find(grantId) : undefined;
+  if (!firstParty) {
+    return existing;
+  }
   const accountId = oidc.session?.accountId;
-  if (!grantId && !(firstParty && accountId)) {
+  if (!existing && !accountId) {
     return undefined;
   }
-  const grant = grantId
-    ? await oidc.provider.Grant.find(grantId)
-    : new oidc.provider.Grant({ accountId, clientId: client.clientId });
-  if (!grant || !firstParty) {
-    return grant;
-  }
+  const grant = existing ?? new oidc.provider.Grant({ accountId, clientId: client.clientId });
   const granted = new Set(grant.getOIDCScope().split(' '));
   const scopes = [...oidc.requestParamOIDCScopes].filter((scope) => !granted.has(scope));
   const grantedClaims = new Set(grant.getOIDCClaims());
@@ -157,7 +162,7 @@ export async function loadExistingGrant(ctx: KoaContextWithOIDC) {
       resourcesChanged = true;
     }
   }
-  if (!grantId || scopes.length > 0 || claims.length > 0 || resourcesChanged) {
+  if (!existing || scopes.length > 0 || claims.length > 0 || resourcesChanged) {
     grant.addOIDCScope(scopes.join(' '));
     grant.addOIDCClaims(claims);
     await grant.save();
