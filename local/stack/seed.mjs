@@ -190,8 +190,8 @@ async function ensureLink(token, backend, native) {
   const listed = await call('GET', `/admin/applications/${backend.id}/links`, { token });
   if (listed.status === 404) {
     throw new Error(
-      'This API has no client link routes (ADR 0002 N4). They arrive in API v0.23.0; use an API ' +
-        'image built from main until then, which is what compose.api-source.yaml does.',
+      'This API has no client link routes (ADR 0002 N4). They need API v0.23.0 or later; set ' +
+        'SEAMLESS_API_IMAGE in settings.env to that image.',
     );
   }
   if (listed.status >= 300) throw new Error(`list links: ${listed.status}`);
