@@ -74,8 +74,8 @@
     "provenance": true
   },
   "dependencies": {
-    "@seamless-auth/core": "^0.23.0",
-    "@seamless-auth/express": "^0.23.0",
+    "@seamless-auth/core": "^0.26.0",
+    "@seamless-auth/express": "^0.26.0",
     "@seamless-auth/types": "^0.40.0",
     "cookie-parser": "^1.4.7",
     "express": "^5.3.0",
@@ -88,7 +88,7 @@
     "@commitlint/cli": "^21.2.4",
     "@commitlint/config-conventional": "^21.2.4",
     "@eslint/js": "^10.0.1",
-    "@seamless-auth/react": "^0.19.2",
+    "@seamless-auth/react": "^0.20.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.6",
