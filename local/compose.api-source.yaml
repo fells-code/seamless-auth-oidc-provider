@@ -1,8 +1,0 @@
-# The client link routes (ADR 0002 N4) are on the API's main branch and not in a published image
-# yet. Builds the API at a pinned commit until v0.23.0 is published; see the COMPOSE_FILE line in
-# settings.env.example.
-services:
-  api:
-    image: seamless-auth-api:local-${SEAMLESS_API_REF:-bcab4d1b62ebb1f14e9b3eda8297ede01e38962f}
-    build:
-      context: https://github.com/fells-code/seamless-auth-api.git#${SEAMLESS_API_REF:-bcab4d1b62ebb1f14e9b3eda8297ede01e38962f}

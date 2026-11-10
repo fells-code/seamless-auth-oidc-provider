@@ -41,7 +41,7 @@ services:
       retries: 30
 
   api:
-    image: ${SEAMLESS_API_IMAGE:-ghcr.io/fells-code/seamless-auth-api:v0.22.0}
+    image: ${SEAMLESS_API_IMAGE:-ghcr.io/fells-code/seamless-auth-api:v0.23.0}
     depends_on:
       postgres:
         condition: service_healthy
@@ -113,7 +113,7 @@ services:
       - ./.generated:/generated
 
   edge:
-    image: ${SEAMLESS_EDGE_IMAGE:-ghcr.io/fells-code/seamless-auth-oidc-provider:v0.3.0}
+    image: ${SEAMLESS_EDGE_IMAGE:-ghcr.io/fells-code/seamless-auth-oidc-provider:v0.4.0}
     depends_on:
       seed:
         condition: service_completed_successfully

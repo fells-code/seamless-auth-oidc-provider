@@ -22,9 +22,8 @@ budget (`RATE_LIMIT` and `DELAY_AFTER` in [`compose.yaml`](compose.yaml), which 
 local/up.sh
 ```
 
-The first run takes a few minutes, because it builds the API (see
-[Unreleased API](#unreleased-api)). It stops and tells you if a port is taken: change `TLS_PORT`,
-`API_PORT` or `MAILBOX_PORT` in `local/settings.env`, which it creates from
+The first run takes a few minutes while it pulls the images. It stops and tells you if a port is
+taken: change `TLS_PORT`, `API_PORT` or `MAILBOX_PORT` in `local/settings.env`, which it creates from
 [`settings.env.example`](settings.env.example). `APP_NAME` there sets the hostnames.
 
 | Step                   | What happens                                                                                                                                                                                                 |
@@ -158,10 +157,11 @@ local/down.sh --wipe  # Also removes its volumes and local/.generated/: back to 
 Both act only on this compose project (`COMPOSE_PROJECT_NAME`). Remove the CA from your trust
 store yourself.
 
-## Unreleased API
+## API version
 
-The client link routes are on the API's `main` branch and arrive in API v0.23.0, which is not
-published yet. Until then `COMPOSE_FILE` in `settings.env` adds
-[`compose.api-source.yaml`](compose.api-source.yaml), which builds the API at a pinned commit. The
-edge is the published image. Against the published API v0.22.0, the seed stops at the link and says
-why.
+The client link routes need API v0.23.0 or later, and the recipe pins that published image. Against
+an older API the seed stops at the link and says why.
+
+A `settings.env` copied before v0.23.0 has a `COMPOSE_FILE` line naming `compose.api-source.yaml`,
+which no longer exists, and pins the older images. Delete that line and update the two image lines,
+or run `local/down.sh` and remove `local/settings.env` so `up.sh` copies a fresh one.
