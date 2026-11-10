@@ -113,7 +113,7 @@ services:
       - ./.generated:/generated
 
   edge:
-    image: ${SEAMLESS_EDGE_IMAGE:-ghcr.io/fells-code/seamless-auth-oidc-provider:v0.4.0}
+    image: ${SEAMLESS_EDGE_IMAGE:-ghcr.io/fells-code/seamless-auth-oidc-provider:v0.4.1}
     depends_on:
       seed:
         condition: service_completed_successfully
