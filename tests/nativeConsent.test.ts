@@ -4,7 +4,7 @@
  * See LICENSE file in the project root for full license information
  */
 
-import type { OidcClientMetadata } from '@seamless-auth/types';
+import type { OidcAuthContext, OidcClientMetadata } from '@seamless-auth/types';
 import * as oidc from 'openid-client';
 import { beforeEach, describe, expect, it } from 'vitest';
 
@@ -266,5 +266,105 @@ describe('the account on a native client confirmation', () => {
     const uid = interactionUid(await follow(browser, flow.url.href));
     expect(await accountOn(uid)).toBeNull();
     expect(started.api.requests.some(({ path }) => path === ACCOUNT_LOOKUP)).toBe(false);
+  });
+});
+
+/**
+ * Each authorization a native client finishes gets its own grant. Revoking a refresh token ends
+ * its whole grant (RFC 7009 section 2.1), so an app that revokes the token a new sign-in replaced
+ * must not end the new one, and a grant a sign-out ended must not stop the next sign-in.
+ */
+describe('grants for a first-party native client', () => {
+  const nativeApp: OidcClientMetadata = {
+    ...desktop,
+    grant_types: ['authorization_code', 'refresh_token'],
+  };
+  let started: Awaited<ReturnType<typeof startEdge>>;
+  let browser: FakeBrowser;
+  let config: oidc.Configuration;
+
+  beforeEach(async () => {
+    started = await startEdge();
+    started.store.addClient(nativeApp);
+    browser = new FakeBrowser(started.base);
+    config = await relyingParty(started.base, nativeApp);
+    signIn(browser);
+  });
+
+  function account(context: Partial<OidcAuthContext>) {
+    started.store.addAccount({
+      sessionId: SESSION,
+      claims: { sub: USER, email: 'ada@example.com', roles: [], org_id: null },
+      context,
+    });
+  }
+
+  async function confirmation(extra: Record<string, string> = {}) {
+    const flow = await startAuthorization(config, nativeApp, {
+      redirect_uri: LOOPBACK,
+      scope: 'openid email offline_access',
+      prompt: 'consent',
+      ...extra,
+    });
+    let at = await follow(browser, flow.url.href);
+    const asked = await browser.get(`/interaction/${interactionUid(at)}/details`);
+    if (asked.json<{ prompt: { name: string } }>().prompt.name === 'login') {
+      const uid = interactionUid(at);
+      let login = await browser.post(`/interaction/${uid}/login`);
+      if (login.status === 409) {
+        expect(login.json()).toMatchObject({ error: 'step_up_required' });
+        account({ acr: 'phr', amr: ['swk', 'user'], authTime: Math.floor(Date.now() / 1000) });
+        login = await browser.post(
+          `/interaction/${uid}/login`,
+          { 'content-type': 'application/json' },
+          JSON.stringify({ afterStepUp: true }),
+        );
+      }
+      expect(login.status).toBe(200);
+      at = await follow(browser, login.json<{ redirectTo: string }>().redirectTo);
+    }
+    return { flow, uid: interactionUid(at) };
+  }
+
+  async function signInToApp(extra: Record<string, string> = {}) {
+    const { flow, uid } = await confirmation(extra);
+    const confirmed = await browser.post(
+      `/interaction/${uid}/consent`,
+      { 'content-type': 'application/json' },
+      JSON.stringify({ confirmed: true }),
+    );
+    expect(confirmed.status).toBe(200);
+    const callback = await follow(browser, confirmed.json<{ redirectTo: string }>().redirectTo);
+    return oidc.authorizationCodeGrant(config, callback, {
+      pkceCodeVerifier: flow.codeVerifier,
+      expectedState: flow.state,
+      expectedNonce: flow.nonce,
+    });
+  }
+
+  it('keeps a new sign-in when the app revokes the refresh token it replaced', async () => {
+    account({ acr: 'phr', amr: ['swk', 'user'], authTime: Math.floor(Date.now() / 1000) - 600 });
+    const first = await signInToApp();
+    // A step-up, as a desktop app asks for one before a sensitive route.
+    const second = await signInToApp({ acr_values: 'phr', max_age: '30' });
+    expect(second.refresh_token).toBeDefined();
+
+    await oidc.tokenRevocation(config, first.refresh_token!, {
+      token_type_hint: 'refresh_token',
+    });
+
+    const refreshed = await oidc.refreshTokenGrant(config, second.refresh_token!);
+    expect(refreshed.access_token).toBeDefined();
+  });
+
+  it('names the account on the next sign-in after a sign-out ended the grant', async () => {
+    const first = await signInToApp();
+    await oidc.tokenRevocation(config, first.refresh_token!, {
+      token_type_hint: 'refresh_token',
+    });
+
+    const { uid } = await confirmation();
+    const details = await browser.get(`/interaction/${uid}/details`);
+    expect(details.json()).toMatchObject({ account: { identifier: 'ada@example.com' } });
   });
 });
